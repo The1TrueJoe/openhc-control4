@@ -43,8 +43,12 @@ jobs:
           f=driver/build/out/openhc.c4z
           unzip -l "$f"
           for n in driver.xml driver.lua www/documentation.html; do unzip -l "$f" | grep -q " $n$"; done
-          unzip -p "$f" driver.xml | grep -q "<version>${{ github.run_number }}</version>"
-          test "$(unzip -p "$f" driver.xml | grep -c '<connection')" -ge 30
+          x=$(unzip -p "$f" driver.xml)
+          v=$(printf '%s' "$x" | grep -o '<version>[^<]*</version>' | head -1)
+          n=$(printf '%s' "$x" | grep -o '<connection[ >]' | wc -l)
+          echo "packaged: $v, $n connections"
+          test "$v" = "<version>${{ github.run_number }}</version>"
+          test "$n" -eq "$(grep -o '<connection[ >]' driver/driver.xml | wc -l)"   # every one survived
       - uses: actions/upload-artifact@v4
         with:
           name: openhc-c4z
