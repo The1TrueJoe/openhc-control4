@@ -1,205 +1,82 @@
 # openhc-control4
 
-Makes an [openHC](https://github.com/The1TrueJoe/openHC) controller a Control4
-controller again. One Control4 driver puts the box back in your project:
+Keeps old Control4 controllers useful in a current Control4 system.
 
-- **the on-screen navigator**: the room's remote drives a 10-ft UI that WebKit
-  draws on the box's own video output, showing your real project;
-- **the IO**: the box's relays, contacts, IR outputs and serial ports appear as
-  ordinary Control4 connections, to bind like a controller's own.
+Control4 has left a lot of working hardware behind. The HC-250 can't run OS 3
+at all. The HC-800 stops at OS 3.3. The EA series is reaching the end of its
+support. The hardware still has its relays, contacts, IR, serial ports and
+audio outputs, and still works.
 
-Director still runs on your Control4 controller. The openHC box becomes a
-device in that project, the way a secondary controller is one.
+This project puts those controllers back into a current Control4 project. They
+run [openHC](https://github.com/The1TrueJoe/openHC) instead of Control4's OS,
+and one Control4 driver, `openhc.c4z`, gives Director what they have:
 
-| Controller | Navigator on screen | IO |
-|---|:---:|:---:|
-| HC-800 | ✅ (component out, cog on Mesa i915) | ✅ |
-| EA-1 / EA-3 | ✅ (HDMI, WPE on the SGX545) | ✅ |
-| HC-250 | ⏳ openHC has no on-screen view (`wpe`) or persistent `/data` on it yet | ✅ 1 relay, 1 contact, 5 IR, 2 serial (driver only) |
-| CA-1, IO Extender | no video output | ✅ whatever iod serves (driver only) |
+- **IO:** relays, contacts, IR outputs and serial ports, as ordinary Control4
+  connections.
+- **Digital audio:** Control4's Digital Media streams to the box's audio
+  outputs, one stream per output, using
+  [control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client).
+- **On-screen navigator:** a 10-ft UI on the TV, driven by the room's remote and
+  showing your project.
 
-"Driver only" means nothing goes on the box: the driver reaches openHC's iod
-directly. The flasher's Control4 option still saves the driver for these boards.
-They don't announce themselves over SDDP, so in Composer you identify the
-**openHC Controller** connection on the Network tab with the box's address.
+Director still runs on a supported Control4 controller. The openHC box joins
+that project as a device.
 
-## How it fits together
+## Boards
 
-```
- C4 remote ─▶ Director (your Control4 controller)
-                │  runs the openHC Controller driver (openhc.c4z)
-                │
-                ├── nav keys + a Director REST token, NDJSON on :9010 ──┐
-                │                                                       ▼
-                │                       openHC box: c4nav (control4-fake-navigator's backend)
-                │                         reads rooms/devices/now-playing from Director's
-                │                         REST API with that token, serves the UI on :8090
-                │                                                       ▼
-                │                       WPE WebKit (openHC's on-screen view) ─▶ HDMI / component
-                │
-                └── relays / contacts / IR / serial, MQTT on :1883 ──▶ openHC iod ─▶ the IO
-```
+| Controller | Control4 OS limit | IO | Digital audio | Navigator on TV |
+|---|---|---|---|---|
+| HC-250 | can't reach OS 3 | 1 relay, 1 contact, 4 IR + blaster, 2 serial | not yet | not yet |
+| HC-800 | OS 3.3 | 4 relays, 4 contacts, 6 IR, 2 serial | Analog 1, Analog 2, coax, HDMI | ✅ HDMI / component |
+| EA-1 | support ending | 4 IR + blaster (2 shared with serial) | HDMI | ✅ HDMI |
+| EA-3 | support ending | 1 relay, 1 contact, 6 IR + blaster (3 shared with serial) | analog, digital, HDMI | ✅ HDMI |
+| CA-1 | | 1 serial (RS-232/485) | | |
+| IO Extender (v1) | | 8 relays, 8 contacts, 8 IR, 4 serial | | |
 
-The UI is fed from the driver: it mints the REST token on the Director
-controller and hands it over, so the box needs no credentials, `.env` or SSH
-to the controller. The IO half talks to openHC's iod over its normal MQTT
-topics, so it needs nothing installed on the box, and it works on boards with
-no screen.
-
-## What's in here
-
-| Path | What |
-|---|---|
-| `driver/` | the Control4 driver. `driver.lua` is control4-navigator-sink-lib's navigator driver, unchanged; `io.lua` adds the IO and is appended to it by `package.sh` |
-| `navigator/` | submodule: [control4-fake-navigator](https://github.com/The1TrueJoe/control4-fake-navigator) (UI + backend), which carries [control4-navigator-sink-lib](https://github.com/The1TrueJoe/control4-navigator-sink-lib) |
-| `box/init` | the box side's start/stop script, at `/data/extensions/control4/init` |
-| `audio-client/` | submodule: [control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client), the Control4 OS3 digital audio client the box runs |
-| `tools/` | box helpers: `c4sddp` announces the box over Control4's SDDP (with the shared [`sddp`](https://github.com/The1TrueJoe/sddp) crate) so Composer finds it; `c4zones` writes the audio client's zones from openHC's outputs |
-| `.github/workflows/build.yml` | builds `openhc.c4z` and `openhc-control4.tar.gz`; attaches both to a release |
-
-## What it needs from openHC
-
-An image with the `wpe` feature (the on-screen view, `S95ohc-display`),
-`iomcu`/iod for the IO, and `S96ohc-extensions`, which starts what is in
-`/data/extensions` at boot. `/data` survives a reboot on every board, including
-the HC-800, whose root is a RAM initramfs.
+The HC-250, CA-1 and IO Extender get their IO from the driver alone. Nothing is
+installed on the box. The HC-250's audio and navigator wait on openHC support
+for its display and storage.
 
 ## Install
 
-**With the openHC flasher** (recommended): find the controller, check it, pick
-the release, and leave **Make it a Control4 controller again** ticked on the
-Install screen. When openHC is in, the flasher waits for the box to come back
-(by MAC, since its DHCP address usually changes), installs this, points the
-on-screen view at the navigator, and saves `openhc.c4z` to your Downloads.
+1. Install openHC with the
+   [openHC flasher](https://github.com/The1TrueJoe/openHC#the-flasher) and leave
+   **Make it a Control4 controller again** ticked. The flasher sets the box up and
+   saves `openhc.c4z` to your Downloads.
+2. In Composer Pro, add the driver (Driver → Add Driver… → `openhc.c4z`).
+3. Add the openHC box from the discovered devices. It fills in its own address.
+   On the HC-250, CA-1 and IO Extender, enter the address on the Network tab
+   instead.
+4. Bind what the box has: HDMI to the TV for the navigator, the audio outputs to
+   rooms, and the relays, contacts, IR and serial ports like a controller's own.
 
-From the command line, the same:
+The driver lists every board's connections, so leave the ones your box doesn't
+have unbound. Its Documentation tab shows the box's own openHC dashboard.
 
-```bash
-ohc-flash install <ip> --images openhc-<board>-<version>.zip --control4
-```
+On a box already running openHC: `ohc-flash control4 <ip>`.
 
-On a box already running openHC:
+## Not yet confirmed
 
-```bash
-ohc-flash control4 <ip>
-```
-
-**In Composer Pro:**
-
-1. Driver → Add Driver… → `openhc.c4z`.
-2. Add the openHC box from the discovered devices. The box announces itself
-   over SDDP (`c4sddp`), so Composer pairs it with the driver and fills in its
-   address. Without discovery, identify the **openHC Controller** connection on
-   the Network tab like any IP device.
-3. Bind **HDMI (Audio/Video)** to the TV's input. The Onscreen Navigator binds
-   itself, so the room's C4/menu button now opens the UI on that TV.
-4. Bind the IO connections your box has. The driver lists every board's IO, so
-   some connections won't exist on yours; leave those unbound. If iod has
-   `IOD_TOKEN` set, put it in **IO Token**.
-
-The driver's **Documentation** tab is a setup guide and shows the box's own
-dashboard (settings, IO, the display, updates). The **openHC Web UI** property
-links to the same page. **Link Status**, **Token Status** and **IO Status**
-report on the navigator link, the project token and the IO link.
-
-## Digital audio
-
-Control4's Digital Media plays to the box like it does to a Control4
-controller, one stream per audio output. The box runs
-[control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client),
-an open implementation of Control4 OS3's audio client.
-
-- **Outputs come from openHC, not from here.** openHC's audiod already knows
-  the board's outputs and makes each one a shared, mixable ALSA PCM
-  (`ohc_analog1`, `ohc_hdmi`, …). `c4zones` reads them from audiod's API and
-  gives the client one zone per output. Nothing in this repository lists a
-  board's audio hardware.
-- **Ports line up with the driver.** Director numbers a device's audio outputs
-  `6200 + index`. The driver declares Audio Output 1–3 (4000–4002) and then
-  HDMI (4072), so the box's non-HDMI outputs take 6200–6202 in audiod's order,
-  and HDMI takes 6203. Bind the outputs your box has.
-- **HDMI plays alongside the navigator.** The HDMI zone plays into `ohc_hdmi`,
-  a dmix, and openHC's WebKit is built without multimedia, so it never holds
-  the device.
-- **One volume.** Room volume and mute drive audiod's per-output level (the
-  same level its AirPlay/Spotify sliders and web UI set) over the driver's MQTT
-  link, and the client's zones stay at 100. Mute is level 0 with the level
-  remembered.
-
-| Connection | Binding | Client port | Box output |
-|---|---|---|---|
-| Digital Audio Client (input) | 3003 | 6100 (control) | |
-| Audio Output 1–3 | 4000–4002 | 6200–6202 | audiod's non-HDMI outputs, in order |
-| HDMI (Audio/Video) | 4072 | 6203 | `ohc_hdmi` |
-
-It needs the `gstreamer` feature in the openHC image. Without it, or on a board
-with no named outputs, the box simply runs no audio client.
-
-**Tested against a stock OS 3.3 EA-3** (with the client's demo driver): the
-media path works end to end. A stream created on the controller's stream
-server reaches the client, its RTP plays, and the client keeps time on the
-master clock on Director's host (:6002).
-
-**Not yet:** Director routing Digital Media to this driver by itself. With the
-demo driver's amp-style shape (an `avswitch` proxy), Director created the room's
-stream but never loaded a source or added the endpoint. This driver presents
-its outputs on the controller proxy, as Control4's own controllers do, which
-may behave differently; that needs the same test. Also unconfirmed: which proxy
-commands carry volume for a controller's own outputs ("Last IO Command" shows
-them).
-
-## IO mapping
-
-| Connection | Binding | iod |
-|---|---|---|
-| Serial 1–4 | 1–4 | `serial/0–3` |
-| IR Output 1–8 | 11–18 | `ir/0–7` |
-| Relay 1–4 | 21–24 | `relay/0–3` (`OPEN`/`CLOSE`/`TOGGLE`/`TRIGGER`) |
-| Contact 1–4 | 31–34 | `contact/0–3` |
-
-Relay and contact state are reported to Director as `CLOSED`/`OPENED`. iod
-retains them, so a reconnect brings Director up to date without polling.
-
-**Not yet confirmed on hardware:** the exact commands Director sends an IR
-output or serial port that a driver provides. The driver passes on any
-Pronto-looking parameter (IR) or `DATA` (serial), and **Last IO Command** shows
-what actually arrived. Serial received from a device does not reach Director
-yet; that waits on the same capture.
+- Director sending Digital Media to this driver on its own. The audio path
+  itself works against a real EA-3.
+- Which commands Director sends for IR and serial, and for a controller's own
+  output volume. The driver's **Last IO Command** property shows what arrives.
 
 ## Build
 
-CI does it. By hand:
+CI builds both parts on every push: `openhc.c4z`, with Control4's driver
+packager, and `openhc-control4.tar.gz` for the box. Download them from the
+latest run's artifacts. By hand:
 
 ```bash
 git submodule update --init --recursive
-driver/package.sh && (cd driver && lua test.lua)    # openhc.c4z + the IO self-check
+driver/package.sh && (cd driver && lua test.lua)
 ```
 
-```bash
-cd tools && cargo test && cargo build --release --target x86_64-unknown-linux-musl
-```
-
-```bash
-cd navigator/backend && CC_x86_64_unknown_linux_musl=musl-gcc cargo build --release --target x86_64-unknown-linux-musl
-```
-
-```bash
-cd navigator/frontend && npm ci && npm run build
-```
-
-## Security
-
-The Director token the driver sends is a credential for the whole project,
-sent over plain TCP on your LAN. The box's UI listens on `127.0.0.1` only. Set
-**Send Project Token** to `No` to keep the token on the controller, and give the
-box its own `C4_HOST`/`C4_TOKEN` in `/data/extensions/control4/c4nav.conf`
-instead.
-
-## Not yet confirmed on hardware
-
-- Composer pairing the SDDP-discovered box with the driver through
-  `<search_types>` (`openhc:device`). The announcement itself is checked: the
-  flasher's discovery lists it alongside real Control4 devices.
-- The dashboard framed inside Composer's Documentation tab. The **openHC Web UI**
-  link is the fallback.
-- A DriverWorks driver reaching `127.0.0.1:3000` to mint the project token.
+| Path | What |
+|---|---|
+| `driver/` | the Control4 driver: the navigator (from control4-navigator-sink-lib), `io.lua`, `audio.lua` |
+| `navigator/` | submodule: control4-fake-navigator, the on-screen UI and its backend |
+| `audio-client/` | submodule: control4-audio-client |
+| `tools/` | box helpers: `c4sddp` (discovery, with the [sddp](https://github.com/The1TrueJoe/sddp) crate) and `c4zones` (audio zones from openHC's outputs) |
+| `box/init` | starts it all on the box, from `/data/extensions/control4` |
