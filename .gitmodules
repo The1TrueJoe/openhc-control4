@@ -1,3 +1,6 @@
 [submodule "navigator"]
 	path = navigator
 	url = https://github.com/The1TrueJoe/control4-fake-navigator
+[submodule "audio-client"]
+	path = audio-client
+	url = https://github.com/The1TrueJoe/control4-audio-client

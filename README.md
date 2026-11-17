@@ -53,6 +53,7 @@ no screen.
 | `driver/` | the Control4 driver. `driver.lua` is control4-navigator-sink-lib's navigator driver, unchanged; `io.lua` adds the IO and is appended to it by `package.sh` |
 | `navigator/` | submodule: [control4-fake-navigator](https://github.com/The1TrueJoe/control4-fake-navigator) (UI + backend), which carries [control4-navigator-sink-lib](https://github.com/The1TrueJoe/control4-navigator-sink-lib) |
 | `box/init` | the box side's start/stop script, at `/data/extensions/control4/init` |
+| `audio-client/` | submodule: [control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client), the Control4 OS3 digital audio client the box runs |
 | `tools/` | box helpers: `c4sddp` announces the box over Control4's SDDP so Composer finds it; `c4zones` writes the audio client's zones from openHC's outputs |
 | `.github/workflows/build.yml` | builds `openhc.c4z` and `openhc-control4.tar.gz`; attaches both to a release |
 
