@@ -49,9 +49,21 @@ jobs:
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
         run: cargo build --release --target x86_64-unknown-linux-musl
-      - name: SDDP announcer
-        working-directory: sddp
+      - name: Box tools (c4sddp, c4zones)
+        working-directory: tools
         run: cargo test && cargo build --release --target x86_64-unknown-linux-musl
+      - name: Audio client
+        # control4-audio-client links GStreamer dynamically, so it is built against
+        # an older glibc (bookworm's 2.36) than any openHC image's and runs on the
+        # GStreamer the image's gstreamer feature installs. Skipped until the
+        # audio-client submodule is added.
+        run: |
+          if [ ! -f audio-client/Cargo.toml ]; then echo "no audio-client submodule yet"; exit 0; fi
+          docker run --rm -v "$PWD/audio-client:/src" -w /src debian:bookworm sh -ec '
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends curl ca-certificates build-essential pkg-config libgstreamer1.0-dev >/dev/null
+            curl -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal
+            . "$HOME/.cargo/env" && cargo build --release --locked'
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -65,7 +77,11 @@ jobs:
           X=$P/control4
           install -d $X/bin
           install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend $X/bin/c4nav
-          install -m 0755 sddp/target/x86_64-unknown-linux-musl/release/c4sddp $X/bin/
+          install -m 0755 tools/target/x86_64-unknown-linux-musl/release/c4sddp \
+                          tools/target/x86_64-unknown-linux-musl/release/c4zones $X/bin/
+          if [ -f audio-client/target/release/c4-audio-client ]; then
+            install -m 0755 audio-client/target/release/c4-audio-client $X/bin/
+          fi
           cp -R navigator/frontend/dist $X/www
           install -m 0755 box/init $X/
           tar -C $P --owner=0 --group=0 -czf openhc-control4.tar.gz .

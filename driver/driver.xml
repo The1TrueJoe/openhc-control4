@@ -47,6 +47,19 @@
       <type>2</type><consumer>False</consumer><audiosource>False</audiosource>
       <videosource>False</videosource><linelevel>False</linelevel>
       <classes><class><classname>UI_DEVICE</classname></class></classes><hidden>True</hidden></connection>
+    <!-- Digital audio, shaped like Control4's own controllers: Digital Media plays to
+         the box through this input, and Director numbers the audio outputs below
+         6200 + their index, so 4000-4002 are 6200-6202 and HDMI (4072) is 6203. The
+         box's c4zones gives its outputs those ports (HDMI on 6203, the others in
+         order); bind the ones your box has. -->
+    <connection proxybindingid="5001"><id>3003</id><facing>6</facing>
+      <connectionname>Digital Audio Client</connectionname><type>6</type>
+      <consumer>True</consumer><audiosource>False</audiosource><videosource>False</videosource>
+      <linelevel>True</linelevel>
+      <classes><class><autobind>True</autobind><classname>DIGITAL_AUDIO_CLIENT</classname></class></classes></connection>
+    <connection proxybindingid="5001"><id>4000</id><facing>6</facing><connectionname>Audio Output 1</connectionname><type>6</type><consumer>False</consumer><audiosource>True</audiosource><videosource>False</videosource><linelevel>True</linelevel><classes><class><classname>STEREO</classname></class><class><classname>SPEAKER</classname></class></classes></connection>
+    <connection proxybindingid="5001"><id>4001</id><facing>6</facing><connectionname>Audio Output 2</connectionname><type>6</type><consumer>False</consumer><audiosource>True</audiosource><videosource>False</videosource><linelevel>True</linelevel><classes><class><classname>STEREO</classname></class><class><classname>SPEAKER</classname></class></classes></connection>
+    <connection proxybindingid="5001"><id>4002</id><facing>6</facing><connectionname>Audio Output 3</connectionname><type>6</type><consumer>False</consumer><audiosource>True</audiosource><videosource>False</videosource><linelevel>True</linelevel><classes><class><classname>STEREO</classname></class><class><classname>SPEAKER</classname></class></classes></connection>
     <connection proxybindingid="5001"><id>4072</id><facing>6</facing>
       <connectionname>HDMI (Audio/Video)</connectionname><type>6</type>
       <consumer>False</consumer><audiosource>True</audiosource><videosource>True</videosource>
@@ -61,7 +74,11 @@
     <connection><id>6001</id><facing>6</facing><connectionname>openHC Controller</connectionname>
       <type>4</type><consumer>True</consumer><audiosource>False</audiosource>
       <videosource>False</videosource><linelevel>True</linelevel>
-      <classes><class><classname>TCP</classname><ports><port><number>9010</number></port></ports></class></classes></connection>
+      <classes><class><classname>TCP</classname><ports>
+        <port><name>Navigator</name><number>9010</number></port>
+        <!-- Where Control4's audio streamer reaches the box's audio client (c4-audio-client). -->
+        <port><name>Audioclient</name><number>6100</number><delimiter>0d0a</delimiter></port>
+      </ports></class></classes></connection>
 
     <!-- IO: binding id -> iod index. Serial 1-4 -> serial/0-3, IR 11-18 -> ir/0-7,
          Relay 21-24 -> relay/0-3, Contact 31-34 -> contact/0-3 (see io.lua). -->

@@ -53,7 +53,7 @@ no screen.
 | `driver/` | the Control4 driver. `driver.lua` is control4-navigator-sink-lib's navigator driver, unchanged; `io.lua` adds the IO and is appended to it by `package.sh` |
 | `navigator/` | submodule: [control4-fake-navigator](https://github.com/The1TrueJoe/control4-fake-navigator) (UI + backend), which carries [control4-navigator-sink-lib](https://github.com/The1TrueJoe/control4-navigator-sink-lib) |
 | `box/init` | the box side's start/stop script, at `/data/extensions/control4/init` |
-| `sddp/` | `c4sddp`: announces the box over Control4's SDDP so Composer finds it |
+| `tools/` | box helpers: `c4sddp` announces the box over Control4's SDDP so Composer finds it; `c4zones` writes the audio client's zones from openHC's outputs |
 | `.github/workflows/build.yml` | builds `openhc.c4z` and `openhc-control4.tar.gz`; attaches both to a release |
 
 ## What it needs from openHC
@@ -101,6 +101,44 @@ dashboard (settings, IO, the display, updates). The **openHC Web UI** property
 links to the same page. **Link Status**, **Token Status** and **IO Status**
 report on the navigator link, the project token and the IO link.
 
+## Digital audio
+
+Control4's Digital Media plays to the box like it does to a Control4
+controller, one stream per audio output. The box runs
+[control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client),
+an open implementation of Control4 OS3's audio client.
+
+- **Outputs come from openHC, not from here.** openHC's audiod already knows
+  the board's outputs and makes each one a shared, mixable ALSA PCM
+  (`ohc_analog1`, `ohc_hdmi`, …). `c4zones` reads them from audiod's API and
+  gives the client one zone per output. Nothing in this repository lists a
+  board's audio hardware.
+- **Ports line up with the driver.** Director numbers a device's audio outputs
+  `6200 + index`. The driver declares Audio Output 1–3 (4000–4002) and then
+  HDMI (4072), so the box's non-HDMI outputs take 6200–6202 in audiod's order,
+  and HDMI takes 6203. Bind the outputs your box has.
+- **HDMI plays alongside the navigator.** The HDMI zone plays into `ohc_hdmi`,
+  a dmix, and openHC's WebKit is built without multimedia, so it never holds
+  the device.
+- **One volume.** Room volume and mute drive audiod's per-output level (the
+  same level its AirPlay/Spotify sliders and web UI set) over the driver's MQTT
+  link, and the client's zones stay at 100. Mute is level 0 with the level
+  remembered.
+
+| Connection | Binding | Client port | Box output |
+|---|---|---|---|
+| Digital Audio Client (input) | 3003 | 6100 (control) | |
+| Audio Output 1–3 | 4000–4002 | 6200–6202 | audiod's non-HDMI outputs, in order |
+| HDMI (Audio/Video) | 4072 | 6203 | `ohc_hdmi` |
+
+It needs the `gstreamer` feature in the openHC image. Without it, or on a board
+with no named outputs, the box simply runs no audio client.
+
+**Not yet confirmed on hardware:** whether Director streams to a driver that
+declares this shape, which proxy commands carry volume for a controller's own
+outputs ("Last IO Command" shows them), and which UDP port the RTP arrives on.
+The client's own README and PROTOCOL.md cover the rest.
+
 ## IO mapping
 
 | Connection | Binding | iod |
@@ -129,7 +167,7 @@ driver/package.sh && (cd driver && lua test.lua)    # openhc.c4z + the IO self-c
 ```
 
 ```bash
-cd sddp && cargo test && cargo build --release --target x86_64-unknown-linux-musl
+cd tools && cargo test && cargo build --release --target x86_64-unknown-linux-musl
 ```
 
 ```bash

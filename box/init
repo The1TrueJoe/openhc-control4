@@ -8,12 +8,17 @@
 # portal's). `display` points openHC's on-screen view (S95ohc-display) at it.
 #
 # Also runs c4sddp, which announces the box over Control4's SDDP so Composer
-# discovers it and fills in the driver's address.
+# discovers it and fills in the driver's address, and the audio client
+# (c4-audio-client), which Control4's Digital Media streams to: one zone per
+# audio output openHC's audiod reports, each playing into that output's shared
+# PCM (ohc_<id>, a dmix), so it mixes with AirPlay/Spotify and the navigator.
+# c4zones rewrites its config from audiod's outputs every time it starts.
 #
 # Overrides (SINK_ADDR, HTTP_ADDR, C4_WALLPAPER, ...) in c4nav.conf next to this.
 D=$(cd "$(dirname "$0")" && pwd)
 PIDF=/run/c4nav.pid
 SDDP_PIDF=/run/c4sddp.pid
+AUDIO_PIDF=/run/c4audio.pid
 URL=http://localhost:8090/
 
 export SINK_ADDR=0.0.0.0:9010 HTTP_ADDR=127.0.0.1:8090 WEB_DIR=$D/www
@@ -24,11 +29,17 @@ case "$1" in
 		[ -x $D/bin/c4nav ] || exit 0
 		start-stop-daemon -S -q -b -m -p $PIDF -x /bin/sh -- "$0" run
 		start-stop-daemon -S -q -b -m -p $SDDP_PIDF -x /bin/sh -- "$0" sddp
+		if [ ! -x $D/bin/c4-audio-client ]; then :
+		elif ! ls /usr/lib/libgstreamer-1.0.so.* >/dev/null 2>&1; then
+			logger -t c4audio "no GStreamer in this openHC image (the gstreamer feature): no audio client"
+		else
+			start-stop-daemon -S -q -b -m -p $AUDIO_PIDF -x /bin/sh -- "$0" audio
+		fi
 		;;
 	stop)
-		for p in $PIDF $SDDP_PIDF; do [ -f $p ] && start-stop-daemon -K -q -p $p; done
-		killall -q c4nav c4sddp 2>/dev/null
-		rm -f $PIDF $SDDP_PIDF
+		for p in $PIDF $SDDP_PIDF $AUDIO_PIDF; do [ -f $p ] && start-stop-daemon -K -q -p $p; done
+		killall -q c4nav c4sddp c4-audio-client 2>/dev/null
+		rm -f $PIDF $SDDP_PIDF $AUDIO_PIDF
 		;;
 	restart)
 		"$0" stop; sleep 1; "$0" start ;;
@@ -44,6 +55,17 @@ case "$1" in
 			*)     model="${OHC_MODEL:-controller}" ;;
 		esac
 		while :; do $D/bin/c4sddp "openHC $model" 2>&1 | logger -t c4sddp; sleep 3; done ;;
+	audio)
+		# c4zones: 0 = zones written, 3 = no named outputs on this board, else audiod not up.
+		while :; do
+			$D/bin/c4zones > $D/c4-audio-client.toml.new
+			case $? in
+				0) mv -f $D/c4-audio-client.toml.new $D/c4-audio-client.toml
+				   $D/bin/c4-audio-client $D/c4-audio-client.toml 2>&1 | logger -t c4audio ;;
+				3) logger -t c4audio "no named audio outputs on this board: no audio client"; exit 0 ;;
+			esac
+			sleep 5
+		done ;;
 	display)
 		# The same config webd's POST /api/display writes, where S95ohc-display reads it.
 		[ -r /opt/ohc/board.env ] && . /opt/ohc/board.env

@@ -67,6 +67,28 @@ assert(timers[#timers].ms == 250 and last() == pub("openhc/ea3/cmd/relay/0/set",
 ReceivedFromProxy(13, "SEND_IR", { CODE = "0000 006D 0000 0002 0010 0010" })
 assert(last() == pub("openhc/ea3/cmd/ir/2/send", "0000 006D 0000 0002 0010 0010"))
 
+-- Audio: audiod's retained output map (HDMI last) lands Audio Output 1-3 and
+-- HDMI (4072) on its outputs; room volume becomes audiod's level for that output.
+C4.JsonDecode = function() return { outputs = {
+  { id = "analog1" }, { id = "analog2" }, { id = "coax" }, { id = "hdmi" } } } end
+local reports = {}
+C4.SendToProxy = function(_, id, cmd, p) reports[#reports + 1] = cmd .. " " .. tostring(p and (p.LEVEL or p.MUTE)) end
+mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/audio/map", "{}"))
+ReceivedFromProxy(5001, "SET_VOLUME_LEVEL", { OUTPUT = "4072", LEVEL = "40" })
+assert(last() == pub("openhc/ea3/cmd/audio/level/hdmi", "40"), hex(last()))
+ReceivedFromProxy(5001, "PULSE_VOL_UP", { OUTPUT = "4001" })
+assert(last() == pub("openhc/ea3/cmd/audio/level/analog2", "2"))
+-- Mute is level 0 with the level kept: audiod echoing 0 back stays muted, unmute restores 40.
+ReceivedFromProxy(5001, "MUTE_ON", { OUTPUT = "4072" })
+assert(last() == pub("openhc/ea3/cmd/audio/level/hdmi", "0"))
+mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/audio/level/hdmi", "0"))
+assert(reports[#reports] == "MUTE_CHANGED True", reports[#reports])
+ReceivedFromProxy(5001, "MUTE_OFF", { OUTPUT = "4072" })
+assert(last() == pub("openhc/ea3/cmd/audio/level/hdmi", "40"))
+-- A level set on the box (an AirPlay slider) is reported to Director.
+mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/audio/level/coax", "55"))
+assert(reports[#reports - 1] == "VOLUME_LEVEL_CHANGED 55", reports[#reports - 1])
+
 -- Non-IO bindings still reach the navigator half (it answers this one).
 local sent
 C4.SendToProxy = function(_, id, cmd) sent = id .. " " .. cmd end

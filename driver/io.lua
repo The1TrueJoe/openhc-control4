@@ -58,6 +58,9 @@ local function publish(topic, payload)
   gMqtt:Write(packet(0x30, mstr(gBase .. "/" .. topic) .. payload))
 end
 
+-- For the layers appended after this one (audio.lua): publish under the box's base.
+OHC_PUBLISH = publish
+
 -- ---- iod -> Director ----------------------------------------------------------
 local function notify(kind, index)
   local id = BINDING[kind .. "/" .. index]
@@ -76,6 +79,8 @@ local function on_publish(topic, payload)
   if kind == "relay" or kind == "contact" then
     gState[kind .. "/" .. index] = payload
     notify(kind, tonumber(index))
+  elseif OHC_STATE then
+    OHC_STATE(rest, payload) -- the rest of the box's state (audio.lua)
   end
 end
 
