@@ -55,6 +55,13 @@ have unbound. Its Documentation tab shows the box's own openHC dashboard.
 
 On a box already running openHC: `ohc-flash control4 <ip>`.
 
+There are no releases yet, and the flasher downloads from the latest one. Until
+there is one, take `openhc.c4z` and the box package from a CI run's artifacts.
+
+The driver hands the box a token for your Control4 project, over plain TCP on
+your LAN, so its navigator can show the project. Set **Send Project Token** to
+No to keep the token on the controller.
+
 ## Not yet confirmed
 
 - Director sending Digital Media to this driver on its own. The audio path
