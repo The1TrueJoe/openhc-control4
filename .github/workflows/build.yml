@@ -30,7 +30,9 @@ jobs:
         run: ./package.sh && lua5.1 test.lua
       # The released .c4z comes from Control4's own packager, run on the assembled
       # driver/build; version = run number, so each build is newer to Composer.
-      - uses: control4/drivers-driverpackager@v1
+      # v2-rc3, the archived repo's last commit, pinned: v1 accepts version and
+      # updateModified but never passes them to the packager.
+      - uses: control4/drivers-driverpackager@c491b3e7e42c012fd2aad8aad3e0b9851e8488cc # v2-rc3
         with:
           projectDir: driver/build
           c4zproj: openhc.c4zproj
