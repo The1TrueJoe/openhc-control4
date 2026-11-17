@@ -1,0 +1,41 @@
+#!/bin/sh
+# The Control4 on-screen navigator on an openHC controller.
+#
+# Runs control4-fake-navigator's backend: the openHC Controller driver connects
+# to its sink (:9010) with the room's nav keys and a Director token, and it
+# serves the UI to the box's own web view on :8090 (:8080 is the Wi-Fi setup
+# portal's). `display` points openHC's on-screen view (S95ohc-display) at it.
+#
+# Overrides (SINK_ADDR, HTTP_ADDR, C4_WALLPAPER, ...) in /etc/openhc/c4nav.conf.
+D=/opt/openhc-control4
+PIDF=/run/c4nav.pid
+URL=http://localhost:8090/
+
+export SINK_ADDR=0.0.0.0:9010 HTTP_ADDR=127.0.0.1:8090 WEB_DIR=$D/www
+[ -r /etc/openhc/c4nav.conf ] && { set -a; . /etc/openhc/c4nav.conf; set +a; }
+
+case "$1" in
+	start)
+		[ -x $D/bin/c4nav ] || exit 0
+		start-stop-daemon -S -q -b -m -p $PIDF -x /bin/sh -- "$0" run
+		;;
+	stop)
+		[ -f $PIDF ] && start-stop-daemon -K -q -p $PIDF
+		killall -q c4nav 2>/dev/null
+		rm -f $PIDF
+		;;
+	restart)
+		"$0" stop; sleep 1; "$0" start ;;
+	run)
+		# Restarted if it exits.
+		while :; do $D/bin/c4nav 2>&1 | logger -t c4nav; sleep 3; done ;;
+	display)
+		# The same config webd's POST /api/display writes, where S95ohc-display reads it.
+		[ -r /opt/ohc/board.env ] && . /opt/ohc/board.env
+		CONF="${OHC_DISPLAY_CONF:-/opt/ohc/display.conf}"
+		printf '# written by S97c4nav display\nOHC_DISPLAY_ENABLE=1\nOHC_DISPLAY_URL=%s\nOHC_DISPLAY_THEME=auto\n' "$URL" > "$CONF"
+		[ -x /etc/init.d/S95ohc-display ] && /etc/init.d/S95ohc-display reload
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|display}"; exit 1 ;;
+esac

@@ -1,0 +1,15 @@
+<html><body style="font-family:sans-serif">
+<h2>openHC Controller</h2>
+<p>Puts an openHC controller back in the project: its on-screen navigator on the
+HDMI/component output, and its relays, contacts, IR outputs and serial ports.</p>
+<ol>
+<li><b>Target IP Address</b>: the openHC controller.</li>
+<li>Bind <b>HDMI (Audio/Video)</b> to the TV input; the Onscreen Navigator binds itself.</li>
+<li>Bind the IO connections the box has (relays, contacts, IR, serial) like a controller's own.</li>
+</ol>
+<p><b>Send Project Token</b> = Yes mints a Director REST token here and hands it to the
+box so its UI shows this project. <b>IO Token</b> is iod's IOD_TOKEN, if set.</p>
+<p>Status: <b>Link Status</b> (navigator), <b>Token Status</b>, <b>IO Status</b>.
+<b>Last IO Command</b> shows what Director sent an IO connection.</p>
+<p>https://github.com/The1TrueJoe/openhc-control4</p>
+</body></html>

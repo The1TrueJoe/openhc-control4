@@ -1,0 +1,89 @@
+name: build
+
+# Two artifacts, attached to a release when one is published:
+#   openhc.c4z                  the Control4 driver (Composer Pro: add driver)
+#   openhc-control4.tar.gz      what goes on the box, rooted at / (x86_64:
+#                               HC-800 and the EAs)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  driver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Lua 5.1 + zip
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends lua5.1 zip
+      - name: Package + self-check
+        working-directory: driver
+        run: ./package.sh && lua5.1 test.lua
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openhc-c4z
+          path: driver/openhc.c4z
+          if-no-files-found: error
+
+  box:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Rust (x86_64 musl) + a musl C compiler for ring
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends musl-tools
+      - name: Backend
+        working-directory: navigator/backend
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: cargo build --release --target x86_64-unknown-linux-musl
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Frontend
+        working-directory: navigator/frontend
+        run: npm ci && npm run build
+      - name: Package the box side
+        run: |
+          set -e
+          P=stage
+          install -d $P/opt/openhc-control4/bin $P/etc/init.d
+          install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend \
+                          $P/opt/openhc-control4/bin/c4nav
+          cp -R navigator/frontend/dist $P/opt/openhc-control4/www
+          install -m 0755 box/init.d/S97c4nav $P/etc/init.d/
+          tar -C $P --owner=0 --group=0 -czf openhc-control4.tar.gz .
+          tar -tzvf openhc-control4.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openhc-control4
+          path: openhc-control4.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'release'
+    needs: [driver, box]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber --repo "${{ github.repository }}"

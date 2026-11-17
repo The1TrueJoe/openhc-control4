@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<devicedata>
+  <copyright>Copyright 2026 Joseph Telaak</copyright>
+  <creator>Joseph Telaak</creator>
+  <name>openHC Controller</name>
+  <manufacturer>openHC</manufacturer>
+  <model>openhc-control4</model>
+  <created>2026-11-17</created>
+  <modified>2026-11-17</modified>
+  <version>1</version>
+  <control>lua_gen</control>
+  <controlmethod>ip</controlmethod>
+  <driver>DriverWorks</driver>
+  <documentation file="www/documentation.html"/>
+
+  <!-- An openHC controller back in a Control4 project: the on-screen navigator
+       (the same shape as control4-navigator-sink-lib's driver: controller proxy +
+       uidevice, HDMI out, ONSCREEN_SELECTION 7500) plus the box's IO, served by
+       openHC's iod over MQTT. The IO connections are the fleet's superset; bind
+       the ones your board has (iod: GET http://<box>:7070/api/io). -->
+  <capabilities>
+    <has_video_output>true</has_video_output>
+    <has_ui_device>true</has_ui_device>
+    <has_navigator>true</has_navigator>
+    <auto_bind_onscreen_selection proxybindingid="5001">true</auto_bind_onscreen_selection>
+  </capabilities>
+
+  <proxies>
+    <proxy proxybindingid="5001" primary="True" name="openHC Navigator">controller</proxy>
+    <proxy proxybindingid="5002">uidevice</proxy>
+  </proxies>
+
+  <connections>
+    <connection><id>5001</id><facing>6</facing><connectionname>Controller</connectionname>
+      <type>2</type><consumer>False</consumer><audiosource>False</audiosource>
+      <videosource>False</videosource><linelevel>False</linelevel>
+      <classes><class><classname>CONTROLLER</classname></class></classes><hidden>True</hidden></connection>
+    <connection><id>5002</id><facing>6</facing><connectionname>UI Device</connectionname>
+      <type>2</type><consumer>False</consumer><audiosource>False</audiosource>
+      <videosource>False</videosource><linelevel>False</linelevel>
+      <classes><class><classname>UI_DEVICE</classname></class></classes><hidden>True</hidden></connection>
+    <connection proxybindingid="5001"><id>4072</id><facing>6</facing>
+      <connectionname>HDMI (Audio/Video)</connectionname><type>6</type>
+      <consumer>False</consumer><audiosource>True</audiosource><videosource>True</videosource>
+      <linelevel>True</linelevel><classes><class><classname>HDMI</classname></class></classes></connection>
+    <connection proxybindingid="5001"><id>7500</id><facing>6</facing>
+      <connectionname>Onscreen Navigator</connectionname><type>7</type>
+      <consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource>
+      <linelevel>False</linelevel><classes><class><classname>ONSCREEN_SELECTION</classname></class></classes></connection>
+
+    <!-- IO: binding id -> iod index. Serial 1-4 -> serial/0-3, IR 11-18 -> ir/0-7,
+         Relay 21-24 -> relay/0-3, Contact 31-34 -> contact/0-3 (see io.lua). -->
+    <connection><id>1</id><facing>6</facing><connectionname>Serial 1</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RS_232</classname></class></classes></connection>
+    <connection><id>2</id><facing>6</facing><connectionname>Serial 2</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RS_232</classname></class></classes></connection>
+    <connection><id>3</id><facing>6</facing><connectionname>Serial 3</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RS_232</classname></class></classes></connection>
+    <connection><id>4</id><facing>6</facing><connectionname>Serial 4</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RS_232</classname></class></classes></connection>
+    <connection><id>11</id><facing>6</facing><connectionname>IR Output 1</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>12</id><facing>6</facing><connectionname>IR Output 2</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>13</id><facing>6</facing><connectionname>IR Output 3</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>14</id><facing>6</facing><connectionname>IR Output 4</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>15</id><facing>6</facing><connectionname>IR Output 5</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>16</id><facing>6</facing><connectionname>IR Output 6</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>17</id><facing>6</facing><connectionname>IR Output 7</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>18</id><facing>6</facing><connectionname>IR Output 8</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>IR_OUT</classname></class></classes></connection>
+    <connection><id>21</id><facing>6</facing><connectionname>Relay 1</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RELAY</classname></class></classes></connection>
+    <connection><id>22</id><facing>6</facing><connectionname>Relay 2</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RELAY</classname></class></classes></connection>
+    <connection><id>23</id><facing>6</facing><connectionname>Relay 3</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RELAY</classname></class></classes></connection>
+    <connection><id>24</id><facing>6</facing><connectionname>Relay 4</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>RELAY</classname></class></classes></connection>
+    <connection><id>31</id><facing>6</facing><connectionname>Contact 1</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>CONTACT_SENSOR</classname></class></classes></connection>
+    <connection><id>32</id><facing>6</facing><connectionname>Contact 2</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>CONTACT_SENSOR</classname></class></classes></connection>
+    <connection><id>33</id><facing>6</facing><connectionname>Contact 3</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>CONTACT_SENSOR</classname></class></classes></connection>
+    <connection><id>34</id><facing>6</facing><connectionname>Contact 4</connectionname><type>1</type><consumer>False</consumer><audiosource>False</audiosource><videosource>False</videosource><linelevel>False</linelevel><classes><class><classname>CONTACT_SENSOR</classname></class></classes></connection>
+  </connections>
+
+  <config>
+    <script file="driver.lua" jit="1"/>
+    <properties>
+      <property><name>Target IP Address</name><type>STRING</type><default>192.168.1.146</default>
+        <tooltip>The openHC controller.</tooltip></property>
+      <property><name>Target Port</name><type>RANGED_INTEGER</type><minimum>1</minimum><maximum>65535</maximum><default>9010</default>
+        <tooltip>The on-screen navigator's sink on the openHC controller.</tooltip></property>
+      <property><name>Send Project Token</name><type>LIST</type><items><item>Yes</item><item>No</item></items><default>Yes</default>
+        <tooltip>Mint a Director REST token here and send it to the openHC controller, so its on-screen UI shows this project.</tooltip></property>
+      <property><name>Token Status</name><type>STRING</type><readonly>true</readonly><default></default></property>
+      <property><name>Link Status</name><type>STRING</type><readonly>true</readonly><default>disconnected</default></property>
+      <property><name>Last Command</name><type>STRING</type><readonly>true</readonly><default></default></property>
+      <property><name>IO Port</name><type>RANGED_INTEGER</type><minimum>1</minimum><maximum>65535</maximum><default>1883</default>
+        <tooltip>iod's MQTT port on the openHC controller.</tooltip></property>
+      <property><name>IO Token</name><type>PASSWORD</type><default></default>
+        <tooltip>iod's IOD_TOKEN, if the box sets one.</tooltip></property>
+      <property><name>IO Topic Prefix</name><type>STRING</type><default>openhc</default></property>
+      <property><name>IO Status</name><type>STRING</type><readonly>true</readonly><default>disconnected</default></property>
+      <property><name>Last IO Command</name><type>STRING</type><readonly>true</readonly><default></default>
+        <tooltip>The last command Director sent an IO connection, with its parameters.</tooltip></property>
+    </properties>
+    <actions><action><name>Send Test Line</name><command>TEST_LINK</command></action></actions>
+  </config>
+</devicedata>
