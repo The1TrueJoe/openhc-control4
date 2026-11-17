@@ -175,6 +175,24 @@ local function io_command(io, cmd, p)
   end
 end
 
+-- ---- the box's address ---------------------------------------------------------
+-- Composer fills the Network connection from SDDP discovery (c4sddp on the box)
+-- or the Network tab; Target IP Address follows it, so nothing is typed twice.
+local NET = 6001
+
+local function take_binding_address()
+  local addr = C4:GetBindingAddress(NET)
+  if addr and addr ~= "" and addr ~= Properties["Target IP Address"] then
+    C4:UpdateProperty("Target IP Address", addr)
+    return true
+  end
+end
+
+local function show_web_ui()
+  local ip = Properties["Target IP Address"] or ""
+  C4:UpdateProperty("openHC Web UI", ip ~= "" and ("http://" .. ip .. "/") or "")
+end
+
 -- ---- entry points: IO bindings here, everything else to the navigator ----------
 local navReceivedFromProxy, navOnBindingChanged = ReceivedFromProxy, OnBindingChanged
 local navOnPropertyChanged, navOnDriverLateInit, navOnDriverDestroyed =
@@ -194,8 +212,15 @@ function OnBindingChanged(idBinding, class, bIsBound)
   if bIsBound then notify(io.kind, io.index) end
 end
 
+function OnNetworkBindingChanged(idBinding, bIsBound)
+  if idBinding == NET and bIsBound and take_binding_address() then
+    OnPropertyChanged("Target IP Address")
+  end
+end
+
 function OnPropertyChanged(strProperty)
   navOnPropertyChanged(strProperty)
+  if strProperty == "Target IP Address" then show_web_ui() end
   if strProperty == "Target IP Address" or strProperty == "IO Port"
     or strProperty == "IO Token" or strProperty == "IO Topic Prefix" then
     mqtt_connect()
@@ -203,6 +228,8 @@ function OnPropertyChanged(strProperty)
 end
 
 function OnDriverLateInit()
+  take_binding_address()
+  show_web_ui()
   navOnDriverLateInit()
   mqtt_connect()
   -- PINGREQ well inside the 60 s keepalive.

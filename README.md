@@ -47,37 +47,54 @@ no screen.
 |---|---|
 | `driver/` | the Control4 driver. `driver.lua` is control4-navigator-sink-lib's navigator driver, unchanged; `io.lua` adds the IO and is appended to it by `package.sh` |
 | `navigator/` | submodule: [control4-fake-navigator](https://github.com/The1TrueJoe/control4-fake-navigator) (UI + backend), which carries [control4-navigator-sink-lib](https://github.com/The1TrueJoe/control4-navigator-sink-lib) |
-| `box/` | what goes on the box besides the build: `S97c4nav` |
+| `box/init` | the box side's start/stop script, at `/data/extensions/control4/init` |
+| `sddp/` | `c4sddp`: announces the box over Control4's SDDP so Composer finds it |
 | `.github/workflows/build.yml` | builds `openhc.c4z` and `openhc-control4.tar.gz`; attaches both to a release |
 
 ## What it needs from openHC
 
-An image with the `wpe` feature (the on-screen view, `S95ohc-display`) and
-`iomcu`/iod for the IO. Every HC-800 and EA image has both.
+An image with the `wpe` feature (the on-screen view, `S95ohc-display`),
+`iomcu`/iod for the IO, and `S96ohc-extensions`, which starts what is in
+`/data/extensions` at boot. `/data` survives a reboot on every board, including
+the HC-800, whose root is a RAM initramfs.
 
 ## Install
 
-On the box: the box side is a tarball rooted at `/`. The box's busybox `wget`
-has no TLS, so push it from a computer:
+**With the openHC flasher** (recommended): find the controller, check it, pick
+the release, and leave **Make it a Control4 controller again** ticked on the
+Install screen. When openHC is in, the flasher waits for the box to come back
+(by MAC, since its DHCP address usually changes), installs this, points the
+on-screen view at the navigator, and saves `openhc.c4z` to your Downloads.
+
+From the command line, the same:
 
 ```bash
-curl -L https://github.com/The1TrueJoe/openhc-control4/releases/latest/download/openhc-control4.tar.gz | ssh root@<box> 'gunzip | tar xf - -C / && /etc/init.d/S97c4nav start && /etc/init.d/S97c4nav display'
+ohc-flash install <ip> --images openhc-<board>-<version>.zip --control4
 ```
 
-`display` points the on-screen view at the navigator. The web UI's Display
-setting does the same: `http://localhost:8090/`.
+On a box already running openHC:
 
-In Composer Pro:
+```bash
+ohc-flash control4 <ip>
+```
 
-1. Add `openhc.c4z` (from the same release) and set **Target IP Address** to the box.
-2. Bind **HDMI (Audio/Video)** to the TV's input. The Onscreen Navigator binds
+**In Composer Pro:**
+
+1. Driver → Add Driver… → `openhc.c4z`.
+2. Add the openHC box from the discovered devices. The box announces itself
+   over SDDP (`c4sddp`), so Composer pairs it with the driver and fills in its
+   address. Without discovery, identify the **openHC Controller** connection on
+   the Network tab like any IP device.
+3. Bind **HDMI (Audio/Video)** to the TV's input. The Onscreen Navigator binds
    itself, so the room's C4/menu button now opens the UI on that TV.
-3. Bind the IO connections your box has. The IO connections cover every board,
-   so some won't exist on yours. `curl http://<box>:7070/api/io` lists what the
-   box has. If iod has `IOD_TOKEN` set, put it in **IO Token**.
+4. Bind the IO connections your box has. The driver lists every board's IO, so
+   some connections won't exist on yours; leave those unbound. If iod has
+   `IOD_TOKEN` set, put it in **IO Token**.
 
-The driver reports on itself in **Link Status** (navigator), **Token Status**
-and **IO Status**.
+The driver's **Documentation** tab is a setup guide and shows the box's own
+dashboard (settings, IO, the display, updates). The **openHC Web UI** property
+links to the same page. **Link Status**, **Token Status** and **IO Status**
+report on the navigator link, the project token and the IO link.
 
 ## IO mapping
 
@@ -107,6 +124,10 @@ driver/package.sh && (cd driver && lua test.lua)    # openhc.c4z + the IO self-c
 ```
 
 ```bash
+cd sddp && cargo test && cargo build --release --target x86_64-unknown-linux-musl
+```
+
+```bash
 cd navigator/backend && CC_x86_64_unknown_linux_musl=musl-gcc cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -119,4 +140,14 @@ cd navigator/frontend && npm ci && npm run build
 The Director token the driver sends is a credential for the whole project,
 sent over plain TCP on your LAN. The box's UI listens on `127.0.0.1` only. Set
 **Send Project Token** to `No` to keep the token on the controller, and give the
-box its own `C4_HOST`/`C4_TOKEN` in `/etc/openhc/c4nav.conf` instead.
+box its own `C4_HOST`/`C4_TOKEN` in `/data/extensions/control4/c4nav.conf`
+instead.
+
+## Not yet confirmed on hardware
+
+- Composer pairing the SDDP-discovered box with the driver through
+  `<search_types>` (`openhc:device`). The announcement itself is checked: the
+  flasher's discovery lists it alongside real Control4 devices.
+- The dashboard framed inside Composer's Documentation tab. The **openHC Web UI**
+  link is the fallback.
+- A DriverWorks driver reaching `127.0.0.1:3000` to mint the project token.

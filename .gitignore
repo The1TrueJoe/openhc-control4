@@ -2,3 +2,4 @@ driver/build/
 driver/*.c4z
 stage/
 *.tar.gz
+sddp/target/

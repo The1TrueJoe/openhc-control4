@@ -1,0 +1,13 @@
+[package]
+name = "c4sddp"
+version = "0.1.0"
+edition = "2021"
+description = "Announce an openHC controller over Control4's SDDP so Composer finds it and fills in its address"
+license = "MIT"
+
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+strip = true
+lto = true

@@ -12,7 +12,7 @@ local function client()
   for _, ev in ipairs({ "OnConnect", "OnRead", "OnDisconnect", "OnError" }) do
     c[ev] = function(self, f) h[ev] = f; return self end
   end
-  function c:Connect(ip, port) self.port = port; if port == 1883 then mqtt = self end; return self end
+  function c:Connect(ip, port) self.port, self.ip = port, ip; if port == 1883 then mqtt = self end; return self end
   function c:Write(b) if self.port == 1883 then writes[#writes + 1] = b end end
   function c:ReadAtLeast() end
   function c:Close() end
@@ -22,7 +22,8 @@ end
 
 C4 = {
   CreateTCPClient = client,
-  UpdateProperty = function() end,
+  UpdateProperty = function(_, k, v) Properties[k] = v end,
+  GetBindingAddress = function() return "" end,
   SetTimer = function(_, ms, f, rep) timers[#timers + 1] = { ms = ms, f = f, rep = rep } end,
   SendToProxy = function(_, id, cmd) notifies[#notifies + 1] = id .. " " .. cmd end,
   GetDeviceID = function() return 42 end,
@@ -71,5 +72,13 @@ local sent
 C4.SendToProxy = function(_, id, cmd) sent = id .. " " .. cmd end
 ReceivedFromProxy(5001, "GET_CONTROLLER_DISABLED", {})
 assert(sent == "5001 CONTROLLER_DISABLED", tostring(sent))
+
+-- Composer identifies the Network connection (SDDP or the Network tab): the
+-- driver takes that address, shows the web UI link and reconnects IO there.
+C4.GetBindingAddress = function(_, id) return id == 6001 and "10.0.0.9" or "" end
+OnNetworkBindingChanged(6001, true)
+assert(Properties["Target IP Address"] == "10.0.0.9")
+assert(Properties["openHC Web UI"] == "http://10.0.0.9/")
+assert(mqtt.ip == "10.0.0.9", tostring(mqtt.ip))
 
 print("io.lua: ok")

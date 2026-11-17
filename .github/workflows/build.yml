@@ -2,8 +2,8 @@ name: build
 
 # Two artifacts, attached to a release when one is published:
 #   openhc.c4z                  the Control4 driver (Composer Pro: add driver)
-#   openhc-control4.tar.gz      what goes on the box, rooted at / (x86_64:
-#                               HC-800 and the EAs)
+#   openhc-control4.tar.gz      what goes on the box: control4/, unpacked into
+#                               /data/extensions (x86_64: HC-800 and the EAs)
 on:
   push:
     branches: [main]
@@ -49,6 +49,9 @@ jobs:
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
         run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: SDDP announcer
+        working-directory: sddp
+        run: cargo test && cargo build --release --target x86_64-unknown-linux-musl
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -59,11 +62,12 @@ jobs:
         run: |
           set -e
           P=stage
-          install -d $P/opt/openhc-control4/bin $P/etc/init.d
-          install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend \
-                          $P/opt/openhc-control4/bin/c4nav
-          cp -R navigator/frontend/dist $P/opt/openhc-control4/www
-          install -m 0755 box/init.d/S97c4nav $P/etc/init.d/
+          X=$P/control4
+          install -d $X/bin
+          install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend $X/bin/c4nav
+          install -m 0755 sddp/target/x86_64-unknown-linux-musl/release/c4sddp $X/bin/
+          cp -R navigator/frontend/dist $X/www
+          install -m 0755 box/init $X/
           tar -C $P --owner=0 --group=0 -czf openhc-control4.tar.gz .
           tar -tzvf openhc-control4.tar.gz
       - uses: actions/upload-artifact@v4
