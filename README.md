@@ -15,8 +15,13 @@ device in that project, the way a secondary controller is one.
 |---|:---:|:---:|
 | HC-800 | ✅ (component out, cog on Mesa i915) | ✅ |
 | EA-1 / EA-3 | ✅ (HDMI, WPE on the SGX545) | ✅ |
-| HC-250 | ⏳ waiting on an openHC HC-250 board | ⏳ |
-| CA-1, IO Extender | no video output | ✅ whatever iod serves (driver only, nothing on the box) |
+| HC-250 | ⏳ openHC has no on-screen view (`wpe`) or persistent `/data` on it yet | ✅ 1 relay, 1 contact, 5 IR, 2 serial (driver only) |
+| CA-1, IO Extender | no video output | ✅ whatever iod serves (driver only) |
+
+"Driver only" means nothing goes on the box: the driver reaches openHC's iod
+directly. The flasher's Control4 option still saves the driver for these boards.
+They don't announce themselves over SDDP, so in Composer you identify the
+**openHC Controller** connection on the Network tab with the box's address.
 
 ## How it fits together
 
