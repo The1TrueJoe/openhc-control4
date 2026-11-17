@@ -7,6 +7,9 @@ license = "MIT"
 
 [dependencies]
 serde_json = "1"
+# The SDDP announcer every one of these projects shares (not on crates.io).
+sddp = { git = "https://github.com/The1TrueJoe/sddp", rev = "f1cbff62e434eec6558a2f83b07dd4b62cd60576" }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "signal"] }
 
 [profile.release]
 opt-level = "s"

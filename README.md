@@ -54,7 +54,7 @@ no screen.
 | `navigator/` | submodule: [control4-fake-navigator](https://github.com/The1TrueJoe/control4-fake-navigator) (UI + backend), which carries [control4-navigator-sink-lib](https://github.com/The1TrueJoe/control4-navigator-sink-lib) |
 | `box/init` | the box side's start/stop script, at `/data/extensions/control4/init` |
 | `audio-client/` | submodule: [control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client), the Control4 OS3 digital audio client the box runs |
-| `tools/` | box helpers: `c4sddp` announces the box over Control4's SDDP so Composer finds it; `c4zones` writes the audio client's zones from openHC's outputs |
+| `tools/` | box helpers: `c4sddp` announces the box over Control4's SDDP (with the shared [`sddp`](https://github.com/The1TrueJoe/sddp) crate) so Composer finds it; `c4zones` writes the audio client's zones from openHC's outputs |
 | `.github/workflows/build.yml` | builds `openhc.c4z` and `openhc-control4.tar.gz`; attaches both to a release |
 
 ## What it needs from openHC
@@ -135,10 +135,18 @@ an open implementation of Control4 OS3's audio client.
 It needs the `gstreamer` feature in the openHC image. Without it, or on a board
 with no named outputs, the box simply runs no audio client.
 
-**Not yet confirmed on hardware:** whether Director streams to a driver that
-declares this shape, which proxy commands carry volume for a controller's own
-outputs ("Last IO Command" shows them), and which UDP port the RTP arrives on.
-The client's own README and PROTOCOL.md cover the rest.
+**Tested against a stock OS 3.3 EA-3** (with the client's demo driver): the
+media path works end to end. A stream created on the controller's stream
+server reaches the client, its RTP plays, and the client keeps time on the
+master clock on Director's host (:6002).
+
+**Not yet:** Director routing Digital Media to this driver by itself. With the
+demo driver's amp-style shape (an `avswitch` proxy), Director created the room's
+stream but never loaded a source or added the endpoint. This driver presents
+its outputs on the controller proxy, as Control4's own controllers do, which
+may behave differently; that needs the same test. Also unconfirmed: which proxy
+commands carry volume for a controller's own outputs ("Last IO Command" shows
+them).
 
 ## IO mapping
 
