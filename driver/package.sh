@@ -6,9 +6,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 nav=../navigator/lib/driver/driver.lua
-[ -f "$nav" ] || { echo "navigator submodule missing: git submodule update --init --recursive" >&2; exit 1; }
+mqtt=../control4-lua-mqtt/mqtt.lua
+for f in "$nav" "$mqtt"; do
+  [ -f "$f" ] || { echo "submodule missing ($f): git submodule update --init --recursive" >&2; exit 1; }
+done
 rm -rf build && mkdir -p build/www
-cat "$nav" io.lua audio.lua > build/driver.lua
+# control4-lua-mqtt (global C4MQTT) must precede io.lua, which uses it.
+cat "$nav" "$mqtt" io.lua audio.lua > build/driver.lua
 cp driver.xml openhc.c4zproj build/ && cp -R www/. build/www/
 out="$(pwd)/openhc.c4z"
 rm -f "$out"

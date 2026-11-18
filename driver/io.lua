@@ -32,19 +32,9 @@ local gMqtt, gMqttUp, gBuf, gBase, gRetrying = nil, false, "", nil, false
 local gState = {}  -- "relay/0" -> "ON" | "OFF", as iod last reported
 
 -- ---- MQTT framing -----------------------------------------------------------
-local function u16(n) return string.char(math.floor(n / 256) % 256, n % 256) end
-local function mstr(s) return u16(#s) .. s end
-
-local function packet(hdr, body)
-  local n, len = #body, ""
-  repeat
-    local d = n % 128
-    n = math.floor(n / 128)
-    if n > 0 then d = d + 128 end
-    len = len .. string.char(d)
-  until n == 0
-  return string.char(hdr) .. len .. body
-end
+-- The MQTT 3.1.1 / QoS 0 framing is the shared control4-lua-mqtt lib (global C4MQTT),
+-- concatenated ahead of this file by package.sh. We own only the transport (a
+-- C4:CreateTCPClient to the box's broker) and the topic contract.
 
 local function prefix() return Properties["IO Topic Prefix"] or "openhc" end
 
@@ -55,7 +45,7 @@ local function publish(topic, payload)
     io_status("not connected; dropped " .. topic)
     return
   end
-  gMqtt:Write(packet(0x30, mstr(gBase .. "/" .. topic) .. payload))
+  gMqtt:Write(C4MQTT.publish(gBase .. "/" .. topic, payload))
 end
 
 -- For the layers appended after this one (audio.lua): publish under the box's base.
@@ -84,37 +74,21 @@ local function on_publish(topic, payload)
   end
 end
 
-local function on_bytes(data)
-  gBuf = gBuf .. data
-  while #gBuf >= 2 do
-    local mult, len, pos = 1, 0, 2
-    repeat
-      if pos > #gBuf then return end
-      local d = gBuf:byte(pos)
-      len = len + (d % 128) * mult
-      mult = mult * 128
-      pos = pos + 1
-    until d < 128
-    if #gBuf < pos - 1 + len then return end
-    local first = gBuf:byte(1)
-    local body = gBuf:sub(pos, pos + len - 1)
-    gBuf = gBuf:sub(pos + len)
-    local typ, qos = math.floor(first / 16), math.floor(first / 2) % 4
-    if typ == 2 then -- CONNACK
-      if body:byte(2) ~= 0 then
-        io_status("refused (" .. body:byte(2) .. ") - check IO Token")
-      else
-        gMqttUp = true
-        io_status("connected " .. TargetIP)
-        local p = prefix()
-        gMqtt:Write(packet(0x82, u16(1) .. mstr(p .. "/+/status") .. "\0" .. mstr(p .. "/+/state/#") .. "\0"))
-      end
-    elseif typ == 3 then -- PUBLISH
-      local tl = body:byte(1) * 256 + body:byte(2)
-      on_publish(body:sub(3, 2 + tl), body:sub(3 + tl + (qos > 0 and 2 or 0)))
+local MQTT_HANDLERS = {
+  connack = function(rc)
+    if rc ~= 0 then
+      io_status("refused (" .. rc .. ") - check IO Token")
+    else
+      gMqttUp = true
+      io_status("connected " .. TargetIP)
+      local p = prefix()
+      gMqtt:Write(C4MQTT.subscribe(1, { p .. "/+/status", p .. "/+/state/#" }))
     end
-  end
-end
+  end,
+  publish = on_publish,
+}
+
+local function on_bytes(data) gBuf = C4MQTT.parse(gBuf .. data, MQTT_HANDLERS) end
 
 local mqtt_connect
 
@@ -130,11 +104,10 @@ mqtt_connect = function()
   if gMqtt then pcall(function() gMqtt:Close() end) end
   gMqttUp, gBuf, gBase = false, "", nil
   local token = Properties["IO Token"] or ""
-  local body = mstr("MQTT") .. string.char(4, token ~= "" and 0xC2 or 0x02) .. u16(60)
-    .. mstr("c4-" .. tostring(C4:GetDeviceID()))
-  if token ~= "" then body = body .. mstr("control4") .. mstr(token) end
+  local connect = C4MQTT.connect("c4-" .. tostring(C4:GetDeviceID()),
+    { keepalive = 60, user = token ~= "" and "control4" or nil, pass = token ~= "" and token or nil })
   gMqtt = C4:CreateTCPClient()
-    :OnConnect(function(c) c:Write(packet(0x10, body)); c:ReadAtLeast(1) end)
+    :OnConnect(function(c) c:Write(connect); c:ReadAtLeast(1) end)
     :OnRead(function(c, data) on_bytes(data); c:ReadAtLeast(1) end)
     :OnDisconnect(function() retry("disconnected") end)
     :OnError(function(_, err) retry("error: " .. tostring(err)) end)
