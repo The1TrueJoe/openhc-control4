@@ -4,3 +4,6 @@
 [submodule "audio-client"]
 	path = audio-client
 	url = https://github.com/The1TrueJoe/control4-audio-client
+[submodule "control4-lua-mqtt"]
+	path = control4-lua-mqtt
+	url = https://github.com/The1TrueJoe/control4-lua-mqtt
