@@ -10,9 +10,9 @@ Run via package.sh. For each model it writes build/<slug>/{driver.xml,
 driver.lua, www} and zips openhc-<slug>.c4z. The same per-model IO counts are
 baked into driver.lua as OHC_IO_GEOM, so driver.xml and io.lua never disagree.
 
-IO counts: ea1/ea3/hc800/ca1/iox are from openHC board.env; ea3 cross-checked
-against the live box's /api/io. AV is from Control4 datasheets.
-VERIFY markers flag counts not yet confirmed against hardware/datasheet.
+IO counts: ea1/ea3/hc800/ca1/iox from openHC board.env (ea3 cross-checked
+against the live box's /api/io); ea5/hc250 confirmed by the user. AV from
+Control4 datasheets.
 """
 import os, shutil, subprocess, sys
 
@@ -36,10 +36,10 @@ MODELS = {
     "ea3": dict(name="openHC EA3", nav=True, io=dict(serial=3, ir=6, relay=1, contact=1),
                 aout=["Analog (3.5mm)", "Coax (S/PDIF)"], hdmi=True,
                 ain=["Analog (3.5mm)", "Coax (S/PDIF)"], video=[], client=True),
-    "ea5": dict(name="openHC EA5", nav=True, io=dict(serial=3, ir=6, relay=1, contact=1),  # IO VERIFY
+    "ea5": dict(name="openHC EA5", nav=True, io=dict(serial=3, ir=6, relay=1, contact=1),
                 aout=["Analog 1", "Analog 2", "Coax 1 (S/PDIF)", "Coax 2 (S/PDIF)"], hdmi=True,
                 ain=["Analog 1", "Analog 2", "Coax 1 (S/PDIF)", "Coax 2 (S/PDIF)"], video=[], client=True),
-    "hc250": dict(name="openHC HC250", nav=False, io=dict(serial=1, ir=4, relay=1, contact=1),  # IO VERIFY
+    "hc250": dict(name="openHC HC250", nav=False, io=dict(serial=1, ir=4, relay=1, contact=1),
                   aout=["Analog (3.5mm)"], hdmi=True, ain=["Analog (3.5mm)"], video=["Component"], client=True),
     "hc800": dict(name="openHC HC800", nav=True, io=dict(serial=2, ir=6, relay=4, contact=4),
                   aout=["Analog 1 (RCA)", "Analog 2 (RCA)", "Coax (S/PDIF)"], hdmi=True,
