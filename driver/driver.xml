@@ -27,10 +27,8 @@
        by has_navigator + the ONSCREEN_SELECTION endpoint (7500), the same shape
        as control4-navigator-sink-lib's driver (controller proxy + uidevice,
        HDMI out). Plus the box's IO, served by openHC's iod over MQTT. The IO
-       connections are NOT listed here: the driver adds them dynamically from
-       what the box reports (iod: GET http://<box>:7070/api/io), so one driver
-       serves every openHC model and each shows exactly the IO it has. See
-       io.lua. -->
+       connections are the fleet's superset; bind the ones your board has (iod:
+       GET http://<box>:7070/api/io). -->
   <capabilities>
     <has_video_output>true</has_video_output>
     <has_ui_device>true</has_ui_device>
