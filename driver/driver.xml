@@ -21,11 +21,14 @@
     <category>Controllers</category>
   </composer_categories>
 
-  <!-- An openHC controller back in a Control4 project: the on-screen navigator
-       (the same shape as control4-navigator-sink-lib's driver: controller proxy +
-       uidevice, HDMI out, ONSCREEN_SELECTION 7500) plus the box's IO, served by
-       openHC's iod over MQTT. The IO connections are the fleet's superset; bind
-       the ones your board has (iod: GET http://<box>:7070/api/io). -->
+  <!-- An openHC controller back in a Control4 project. The device's identity is
+       the controller (primary proxy 5001, name matches <name> above); the
+       on-screen navigator is one of its capabilities, not the device, expressed
+       by has_navigator + the ONSCREEN_SELECTION endpoint (7500), the same shape
+       as control4-navigator-sink-lib's driver (controller proxy + uidevice,
+       HDMI out). Plus the box's IO, served by openHC's iod over MQTT. The IO
+       connections are the fleet's superset; bind the ones your board has (iod:
+       GET http://<box>:7070/api/io). -->
   <capabilities>
     <has_video_output>true</has_video_output>
     <has_ui_device>true</has_ui_device>
@@ -34,7 +37,7 @@
   </capabilities>
 
   <proxies>
-    <proxy proxybindingid="5001" primary="True" name="openHC Navigator">controller</proxy>
+    <proxy proxybindingid="5001" primary="True" name="openHC Controller">controller</proxy>
     <proxy proxybindingid="5002">uidevice</proxy>
   </proxies>
 
