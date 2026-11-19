@@ -120,7 +120,7 @@
       <property><name>Last Command</name><type>STRING</type><readonly>true</readonly><default></default></property>
       <property><name>IO Port</name><type>RANGED_INTEGER</type><minimum>1</minimum><maximum>65535</maximum><default>1883</default>
         <tooltip>iod's MQTT port on the openHC controller.</tooltip></property>
-      <property><name>IO Token</name><type>PASSWORD</type><default></default>
+      <property><name>IO Token</name><type>STRING</type><password>true</password><default></default>
         <tooltip>iod's IOD_TOKEN, if the box sets one.</tooltip></property>
       <property><name>IO Topic Prefix</name><type>STRING</type><default>openhc</default></property>
       <property><name>IO Status</name><type>STRING</type><readonly>true</readonly><default>disconnected</default></property>
