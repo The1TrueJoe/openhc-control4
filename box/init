@@ -50,6 +50,26 @@ case "$1" in
 		# One SDDP Type per model (openhc:<slug>) matching that model's driver;
 		# slug = the .c4z, display = what Composer shows.
 		[ -r /opt/ohc/board.env ] && . /opt/ohc/board.env
+		# Some images don't set OHC_MODEL in board.env. iod knows the board, so
+		# ask it (it serves the model string at /api/io) and wait for it at boot.
+		if [ -z "$OHC_MODEL" ]; then
+			i=0
+			while [ $i -lt 30 ]; do
+				board=$(wget -qO- http://127.0.0.1:7070/api/io 2>/dev/null \
+					| sed -n 's/.*"board":"\([^"]*\)".*/\1/p')
+				[ -n "$board" ] && break
+				i=$((i + 1)); sleep 2
+			done
+			case "$board" in
+				*EA-1*)   OHC_MODEL=1 ;;
+				*EA-3*)   OHC_MODEL=3 ;;
+				*EA-5*)   OHC_MODEL=5 ;;
+				*HC-250*) OHC_MODEL=hc250 ;;
+				*HC-800*) OHC_MODEL=hc800 ;;
+				*CA-1*)   OHC_MODEL=ca1 ;;
+				*IOX*|*I/O*) OHC_MODEL=ioxv1 ;;
+			esac
+		fi
 		case "$OHC_MODEL" in
 			1) slug=ea1; model="EA-1" ;;
 			3) slug=ea3; model="EA-3" ;;
