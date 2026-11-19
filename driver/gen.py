@@ -78,15 +78,17 @@ def connections(m):
         outputs.append(("HDMI (Audio/Video)", 4072, ["HDMI"], "True", "True"))
     for idx, (nm, oid, classes, asrc, vsrc) in enumerate(outputs):
         if m["client"]:
-            out.append(conn(3003 + idx, f"Digital Audio Client {idx + 1} ({nm})", 6, "True", "False", "False",
+            out.append(conn(3100 + idx, f"Digital Audio Client {idx + 1} ({nm})", 6, "True", "False", "False",
                             "True", ["DIGITAL_AUDIO_CLIENT"], proxy=5001, autobind=(idx == 0)))
         out.append(conn(oid, nm, 6, "False", asrc, vsrc, "True", classes, proxy=5001))
     for i, label in enumerate(m["video"]):
         out.append(conn(4200 + i, f"{label} Video", 6, "False", "False", "True", "False",
                         [label.upper()], proxy=5001))
-    # Physical audio inputs (declared for binding a source; no Lua behavior yet).
+    # Physical audio inputs (3001+, family convention — same as openSpeakerPoint's
+    # line-in). Declared for binding a source; no Lua behavior yet. Streaming
+    # endpoints live at 3100+ so they never collide with these.
     for i, label in enumerate(m["ain"]):
-        out.append(conn(3010 + i, f"Audio Input {i + 1} ({label})", 6, "True", "False", "False", "True",
+        out.append(conn(3001 + i, f"Audio Input {i + 1} ({label})", 6, "True", "False", "False", "True",
                         ["STEREO", "RCA_IN"], proxy=5001))
     if m["nav"]:
         out.append(conn(7500, "Onscreen Navigator", 7, "False", "False", "False", "False",
