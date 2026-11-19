@@ -25,7 +25,9 @@
   Command" shows what actually arrives.
 ]]--
 
-local PROXY, HDMI, FIRST, MAX_PLAIN, STEP = 5001, 4072, 4000, 3, 2
+-- MAX_PLAIN = how many non-HDMI audio outputs this model has (OHC_AUDIO_PLAIN,
+-- baked per model by gen.py); they occupy 4000..4000+N-1, HDMI is 4072.
+local PROXY, HDMI, FIRST, MAX_PLAIN, STEP = 5001, 4072, 4000, OHC_AUDIO_PLAIN or 3, 2
 
 local gOutputs = {}               -- connection id -> audiod output id
 local gLevel, gMuted, gRamp = {}, {}, {}
