@@ -25,36 +25,30 @@ jobs:
           submodules: recursive
       - name: Lua 5.1 + zip
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends lua5.1 zip
-      - name: Assemble + self-check (Lua 5.1, as on the controller)
+      # One .c4z per openHC model, generated from gen.py's table (static AV + IO,
+      # one SDDP type each). version = run number, so each build is newer to Composer.
+      - name: Generate + self-check (Lua 5.1, as on the controller)
         working-directory: driver
+        env:
+          OHC_VERSION: ${{ github.run_number }}
         run: ./package.sh && lua5.1 test.lua
-      # The released .c4z comes from Control4's own packager, run on the assembled
-      # driver/build; version = run number, so each build is newer to Composer.
-      # v2-rc3, the archived repo's last commit, pinned: v1 accepts version and
-      # updateModified but never passes them to the packager.
-      - uses: control4/drivers-driverpackager@c491b3e7e42c012fd2aad8aad3e0b9851e8488cc # v2-rc3
-        with:
-          projectDir: driver/build
-          c4zproj: openhc.c4zproj
-          outputDir: ./out
-          version: ${{ github.run_number }}
-          updateModified: true
-      - name: Check the packaged driver
+      - name: Check every model's packaged driver
+        working-directory: driver
         run: |
           set -e
-          f=driver/build/out/openhc.c4z
-          unzip -l "$f"
-          for n in driver.xml driver.lua www/documentation.html; do unzip -l "$f" | grep -q " $n$"; done
-          x=$(unzip -p "$f" driver.xml)
-          v=$(printf '%s' "$x" | grep -o '<version>[^<]*</version>' | head -1)
-          n=$(printf '%s' "$x" | grep -o '<connection[ >]' | wc -l)
-          echo "packaged: $v, $n connections"
-          test "$v" = "<version>${{ github.run_number }}</version>"
-          test "$n" -eq "$(grep -o '<connection[ >]' driver/driver.xml | wc -l)"   # every one survived
+          for f in openhc-*.c4z; do
+            for n in driver.xml driver.lua www/documentation.html; do unzip -l "$f" | grep -q " $n$"; done
+            x=$(unzip -p "$f" driver.xml)
+            v=$(printf '%s' "$x" | grep -o '<version>[^<]*</version>' | head -1)
+            t=$(printf '%s' "$x" | grep -o '<type>openhc:[^<]*</type>' | head -1)
+            n=$(printf '%s' "$x" | grep -o '<connection[ >]' | wc -l)
+            echo "$f: $v, $t, $n connections"
+            test "$v" = "<version>${{ github.run_number }}</version>"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: openhc-c4z
-          path: driver/build/out/openhc.c4z
+          path: driver/openhc-*.c4z
           if-no-files-found: error
 
   box:
