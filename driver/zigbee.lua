@@ -51,11 +51,23 @@ end
 
 local function zpublish(body) if OHC_PUBLISH then OHC_PUBLISH("cmd/zigbee", body) end end
 
+-- The zap device-commands. Membership is also the live-test probe: if the Director
+-- ever routes one of these to this DriverWorks ExecuteCommand, we record it in a
+-- readonly property, so "did the Director accept a driver-asserted controller as a
+-- zap?" is visible in Composer without watching the box's MQTT.
+local ZAP_CMDS = { ENABLE_ZAP = true, ENABLE_ZAP_AS_COORDINATOR = true, DISABLE_ZAP = true,
+  SET_ZSERVER_STATE = true, SET_ZSERVER_CHANNEL = true, GET_ZAP_INFO = true, GET_IS_IDENTIFIED = true }
+
 -- Director -> this device (c4soap). Best-guess entrypoint; everything else (TEST_LINK)
 -- falls through to the navigator lib's ExecuteCommand.
 local zNavExecuteCommand = ExecuteCommand
 function ExecuteCommand(strCommand, tParams)
   tParams = tParams or {}
+  if ZAP_CMDS[strCommand] and C4 and C4.UpdateProperty then
+    C4:UpdateProperty("Last IO Command", "zap " .. strCommand .. " " ..
+      ((tParams.coordinator and ("coordinator=" .. tostring(tParams.coordinator) .. " ") or "") ..
+       (tParams.idowner and ("idowner=" .. tostring(tParams.idowner)) or "")))
+  end
   if strCommand == "ENABLE_ZAP" then
     zState.owner = tonumber(tParams.idowner) or zState.owner
     zpublish(string.format('{"op":"enable","coordinator":%d,"owner":%d}',

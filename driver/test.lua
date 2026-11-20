@@ -107,6 +107,8 @@ assert(ExecuteCommand("GET_IS_IDENTIFIED", {}) ==
   "<network_status><identified>true</identified></network_status>")
 ExecuteCommand("ENABLE_ZAP", { coordinator = "0", idowner = "15" })
 assert(last() == pub("openhc/ea3/cmd/zigbee", '{"op":"enable","coordinator":0,"owner":15}'), hex(last()))
+assert(Properties["Last IO Command"] == "zap ENABLE_ZAP coordinator=0 idowner=15",
+  tostring(Properties["Last IO Command"]))
 ExecuteCommand("DISABLE_ZAP", {})
 assert(last() == pub("openhc/ea3/cmd/zigbee", '{"op":"disable"}'))
 
