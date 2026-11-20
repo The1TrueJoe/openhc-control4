@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>openHC Setup</title>
+<style>
+  body { font-family: "Segoe UI", sans-serif; margin: 0; color: #222; background: #fff; }
+  header { padding: 8px 14px; background: #1f2a36; color: #fff; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  header b { margin-right: auto; }
+  input { width: 150px; padding: 4px 6px; }
+  button { padding: 4px 10px; cursor: pointer; }
+  iframe { border: 0; width: 100%; height: calc(100vh - 44px); display: block; }
+  #msg { padding: 16px; max-width: 640px; line-height: 1.45; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <b>openHC Setup</b>
+  <label>Box address <input id="ip" placeholder="finding…"></label>
+  <button id="open">Open</button>
+</header>
+<iframe id="ui" hidden></iframe>
+<div id="msg">Asking the driver for the box's address…</div>
+<script>
+  // Composer opens a driver tab with ?apihost=&driverid=&apitoken=. The driver keeps
+  // the box's address (SDDP, the Network tab, or Target IP Address) in its
+  // OPENHC_ADDRESS variable, read here over Director's REST API — nothing to type.
+  var q = {};
+  location.search.replace(/[?&]+([^=&]+)=([^&]*)/g, function (m, k, v) { q[k] = decodeURIComponent(v); });
+  var ip = document.getElementById("ip"), ui = document.getElementById("ui"), msg = document.getElementById("msg");
+  function load() { try { return localStorage.getItem("openhc-ip") || ""; } catch (e) { return ""; } }
+  function save(v) { try { localStorage.setItem("openhc-ip", v); } catch (e) {} }
+  function show(a) {
+    a = (a || "").trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (!a) { msg.textContent = "The driver doesn't know the box's address yet. Identify it on the Network tab, or type it above."; ip.focus(); return; }
+    ip.value = a; save(a);
+    ui.src = "http://" + a + "/";
+    ui.hidden = false; msg.hidden = true;
+  }
+  // [{"varName":"OPENHC_ADDRESS","value":"10.0.0.105",…}]
+  function findIp(j) {
+    var list = Array.isArray(j) ? j : [];
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].varName === "OPENHC_ADDRESS") return String(list[i].value || "");
+    return "";
+  }
+  document.getElementById("open").onclick = function () { show(ip.value); };
+  ip.onkeydown = function (e) { if (e.key === "Enter" || e.keyCode === 13) show(ip.value); };
+  if (q.apihost && q.driverid) {
+    fetch("https://" + q.apihost + "/api/v1/items/" + q.driverid + "/variables?varnames=OPENHC_ADDRESS", {
+      headers: { Authorization: "Bearer " + q.apitoken }
+    }).then(function (r) { return r.json(); })
+      .then(function (j) { show(findIp(j) || load()); })
+      .catch(function () { show(load()); });
+  } else {
+    show(load());
+  }
+</script>
+</body>
+</html>

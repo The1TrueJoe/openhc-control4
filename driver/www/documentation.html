@@ -4,38 +4,28 @@
 <meta charset="utf-8">
 <title>openHC Controller</title>
 <style>
-  body { font-family: "Segoe UI", sans-serif; margin: 0; color: #222; background: #fff; }
-  header { padding: 10px 14px; background: #1f2a36; color: #fff; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  header b { margin-right: auto; }
-  input { width: 150px; padding: 4px 6px; }
-  button { padding: 4px 10px; cursor: pointer; }
-  iframe { border: 0; width: 100%; height: calc(100vh - 48px); display: block; }
-  #guide { padding: 0 16px 16px; max-width: 760px; line-height: 1.45; }
-  [hidden] { display: none !important; }
+  body { font-family: "Segoe UI", sans-serif; margin: 0; padding: 4px 16px 16px; color: #222; background: #fff; max-width: 760px; line-height: 1.45; }
 </style>
 </head>
 <body>
-<header>
-  <b>openHC Controller</b>
-  <label>Box address <input id="ip" placeholder="192.168.1.50"></label>
-  <button id="open">Show dashboard</button>
-  <button id="help">Setup guide</button>
-</header>
-<iframe id="ui" hidden></iframe>
-<div id="guide">
-  <h2>Setup</h2>
+  <h2>openHC Controller</h2>
+  <p>This driver brings an openHC box into the project as a controller: its on-screen
+    navigator, its audio outputs (as Control4 digital audio zones), and its IO (serial,
+    IR, relays, contacts). The <b>openHC Setup</b> tab is the box's own web UI for its
+    settings, display, audio and updates.</p>
+  <h3>Setup</h3>
   <ol>
     <li><b>Address.</b> If you added this driver from Composer's discovered devices, it
-      already has the box's address. Otherwise identify the <b>openHC Controller</b>
-      connection on the Connections &rarr; Network tab, as for any IP device.</li>
-    <li><b>On-screen navigator.</b> Bind <b>HDMI (Audio/Video)</b> to the TV's input. The
-      Onscreen Navigator binds itself, so the room's C4/menu button opens the UI on that TV.</li>
+      already has the box's address. Otherwise identify the driver's network connection
+      on the Connections &rarr; Network tab, as for any IP device.</li>
+    <li><b>On-screen navigator.</b> Bind <b>HDMI (Audio/Video)</b> to the TV's input, and the
+      <b>Onscreen Navigator</b> to the room, so the room's C4/menu button opens the UI on that TV.</li>
+    <li><b>Audio.</b> Each Digital Audio Client binds to Digital Media by itself. Bind the
+      matching Audio Output to the amplifier or speaker the box feeds; the room then plays
+      Control4 digital audio (ShairBridge, TuneIn, My Music) through the box.</li>
     <li><b>IO.</b> Bind the relays, contacts, IR outputs and serial ports the box has, like a
       controller's own. Connections the box doesn't have are simply left unbound.</li>
   </ol>
-  <p>Put the box's address above to see its own dashboard here: settings, IO, the
-    display, updates. The <b>openHC Web UI</b> property is the same page as a link,
-    and shows the address once the driver knows it.</p>
   <h3>Status (Properties tab)</h3>
   <ul>
     <li><b>Link Status</b>: the on-screen navigator's connection to the box.</li>
@@ -43,25 +33,8 @@
       <b>Send Project Token</b> = No keeps it on this controller.</li>
     <li><b>IO Status</b>: the connection to the box's IO server. If iod has a token set, put it in <b>IO Token</b>.</li>
     <li><b>Last IO Command</b>: what Director last sent an IO connection.</li>
+    <li><b>openHC Web UI</b>: the Setup tab's page as a link, once the driver knows the address.</li>
   </ul>
   <p>https://github.com/The1TrueJoe/openhc-control4</p>
-</div>
-<script>
-  var ip = document.getElementById("ip"), ui = document.getElementById("ui"), guide = document.getElementById("guide");
-  function load(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
-  function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function show() {
-    var a = ip.value.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    if (!a) { ip.focus(); return; }
-    save("openhc-ip", a);
-    ui.src = "http://" + a + "/";
-    ui.hidden = false; guide.hidden = true;
-  }
-  document.getElementById("open").onclick = show;
-  document.getElementById("help").onclick = function () { ui.hidden = true; guide.hidden = false; };
-  ip.onkeydown = function (e) { if (e.key === "Enter" || e.keyCode === 13) show(); };
-  ip.value = load("openhc-ip");
-  if (ip.value) show();
-</script>
 </body>
 </html>

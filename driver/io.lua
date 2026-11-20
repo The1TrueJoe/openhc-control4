@@ -193,6 +193,9 @@ end
 local function show_web_ui()
   local ip = Properties["Target IP Address"] or ""
   C4:UpdateProperty("openHC Web UI", ip ~= "" and ("http://" .. ip .. "/") or "")
+  -- The openHC Setup tab (www/setup.html) reads this over Director's REST API.
+  if not OHC_ADDRESS_VAR then OHC_ADDRESS_VAR = C4:AddVariable("OPENHC_ADDRESS", ip, "STRING", true, false) end
+  C4:SetVariable("OPENHC_ADDRESS", ip)
 end
 
 -- ---- entry points: IO bindings here, everything else to the navigator ----------

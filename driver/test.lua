@@ -28,6 +28,8 @@ C4 = {
   SetTimer = function(_, ms, f, rep) timers[#timers + 1] = { ms = ms, f = f, rep = rep } end,
   SendToProxy = function(_, id, cmd) notifies[#notifies + 1] = id .. " " .. cmd end,
   GetDeviceID = function() return 42 end,
+  AddVariable = function(_, k, v) Vars = Vars or {}; Vars[k] = v; return true end,
+  SetVariable = function(_, k, v) Vars[k] = v end,
   url = function() error("token minting is off in this test") end,
 }
 
@@ -114,3 +116,7 @@ assert(last() == pub("openhc/ea3/cmd/zigbee", '{"op":"disable"}'))
 
 print("io.lua: ok (ea3 static geometry)")
 print("zigbee.lua: ok (ea3 zap bridge)")
+
+-- The Setup tab's address (www/setup.html reads it over the REST API).
+assert(Vars.OPENHC_ADDRESS == "10.0.0.9", tostring(Vars.OPENHC_ADDRESS))
+print("OPENHC_ADDRESS ok")

@@ -174,6 +174,10 @@ def driver_xml(slug, m):
   <config>
     <script file="driver.lua" jit="1"/>
 {props}
+    <tabs>
+      <tab name="openHC Setup" file="setup.html"/>
+      <tab name="openHC Docs" file="documentation.html"/>
+    </tabs>
     <actions><action><name>Send Test Line</name><command>TEST_LINK</command></action></actions>
   </config>
 </devicedata>
