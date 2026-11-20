@@ -197,12 +197,15 @@ def main():
     shutil.rmtree(build, ignore_errors=True)
     nav_lua, mqtt_lua = open(nav).read(), open(mqtt).read()
     io_lua, audio_lua = open(os.path.join(HERE, "io.lua")).read(), open(os.path.join(HERE, "audio.lua")).read()
+    zigbee_lua = open(os.path.join(HERE, "zigbee.lua")).read()
     for slug, m in MODELS.items():
         d = os.path.join(build, slug)
         os.makedirs(os.path.join(d, "www"))
         open(os.path.join(d, "driver.xml"), "w").write(driver_xml(slug, m))
         # control4-lua-mqtt (global C4MQTT) must precede io.lua; prelude first.
-        open(os.path.join(d, "driver.lua"), "w").write(prelude(m) + nav_lua + mqtt_lua + io_lua + audio_lua)
+        # zigbee.lua wraps ExecuteCommand + OHC_STATE, so it comes after audio.lua.
+        open(os.path.join(d, "driver.lua"), "w").write(
+            prelude(m) + nav_lua + mqtt_lua + io_lua + audio_lua + zigbee_lua)
         for n in os.listdir(os.path.join(HERE, "www")):
             shutil.copy(os.path.join(HERE, "www", n), os.path.join(d, "www", n))
         out = os.path.join(HERE, f"openhc-{slug}.c4z")

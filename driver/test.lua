@@ -96,4 +96,21 @@ C4.SendToProxy = function(_, id, cmd) sent = id .. " " .. cmd end
 ReceivedFromProxy(5001, "GET_CONTROLLER_DISABLED", {})
 assert(sent == "5001 CONTROLLER_DISABLED", tostring(sent))
 
+-- Zigbee AP (zigbee.lua): c4zapd state in -> status reads out; ENABLE_ZAP bridges to cmd/zigbee.
+C4.SendToProxy = function() end
+mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/zigbee",
+  '{"enabled":true,"coordinator":0,"owner":15,"identified":true}'))
+assert(ExecuteCommand("GET_ZAP_INFO", {}) ==
+  "<zap><coordinator>0</coordinator><enabled>true</enabled><owner>15</owner></zap>",
+  tostring(ExecuteCommand("GET_ZAP_INFO", {})))
+assert(ExecuteCommand("GET_IS_IDENTIFIED", {}) ==
+  "<network_status><identified>true</identified></network_status>")
+ExecuteCommand("ENABLE_ZAP", { coordinator = "0", idowner = "15" })
+assert(last() == pub("openhc/ea3/cmd/zigbee", '{"op":"enable","coordinator":0,"owner":15}'), hex(last()))
+assert(Properties["Last IO Command"] == "zap ENABLE_ZAP coordinator=0 idowner=15",
+  tostring(Properties["Last IO Command"]))
+ExecuteCommand("DISABLE_ZAP", {})
+assert(last() == pub("openhc/ea3/cmd/zigbee", '{"op":"disable"}'))
+
 print("io.lua: ok (ea3 static geometry)")
+print("zigbee.lua: ok (ea3 zap bridge)")
