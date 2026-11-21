@@ -87,9 +87,9 @@ C4.JsonDecode = function() return { outputs = {
 local reports = {}
 C4.SendToProxy = function(_, id, cmd, p) reports[#reports + 1] = cmd .. " " .. tostring(p and (p.LEVEL or p.MUTE)) end
 mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/audio/map", "{}"))
-ReceivedFromProxy(5001, "SET_VOLUME_LEVEL", { OUTPUT = "4072", LEVEL = "40" })
+ReceivedFromProxy(5003, "SET_VOLUME_LEVEL", { OUTPUT = "4072", LEVEL = "40" })
 assert(last() == pub("openhc/ea3/cmd/audio/level/hdmi", "40"), hex(last()))
-ReceivedFromProxy(5001, "PULSE_VOL_UP", { OUTPUT = "4001" })
+ReceivedFromProxy(5003, "PULSE_VOL_UP", { OUTPUT = "4001" })
 assert(last() == pub("openhc/ea3/cmd/audio/level/coax", "2"))
 
 -- Non-IO bindings still reach the navigator half (it answers this one).
@@ -120,3 +120,27 @@ print("zigbee.lua: ok (ea3 zap bridge)")
 -- The Setup tab's address (www/setup.html reads it over the REST API).
 assert(Vars.OPENHC_ADDRESS == "10.0.0.9", tostring(Vars.OPENHC_ADDRESS))
 print("OPENHC_ADDRESS ok")
+
+-- The audio avswitch confirms an input switch, or Director never starts the stream.
+-- ... and the driver starts the stream itself on the Director's audio3server.
+local confirm, a3c
+C4.SendToProxy = function(_, id, cmd) confirm = id .. " " .. cmd end
+local mk = C4.CreateTCPClient
+C4.CreateTCPClient = function()
+  a3c = mk(); a3c.w = {}; a3c.Write = function(self, b) self.w[#self.w + 1] = b end; return a3c
+end
+ReceivedFromProxy(5003, "SET_INPUT", { INPUT = "3003", OUTPUT = "4000" })
+assert(confirm == "5003 INPUT_OUTPUT_CHANGED", tostring(confirm))
+assert(a3c.ip == "127.0.0.1" and a3c.port == 6000)
+a3c.h.OnConnect(a3c)
+assert(a3c.w[1] == "o1 ADDSTR\r\n", a3c.w[1])
+a3c.h.OnRead(a3c, "o1 ADDSTR STREAM=7\r\no1 OK ADDSTR\r\n")
+assert(a3c.w[2] == "o2 ADDMED 7 " .. OHC_A3_URL .. "\r\n", a3c.w[2])
+a3c.h.OnRead(a3c, "o2 ADDMED MID=7:1\r\no2 OK ADDMED\r\n")
+assert(a3c.w[3] == "o3 ADDCLI 7 10.0.0.9 6200\r\n", a3c.w[3])
+a3c.h.OnRead(a3c, "o3 OK ADDCLI\r\n* SYS STREAM=7:1 x\r\no4 OK SETSTA\r\n")
+assert(a3c.w[4] == "o4 SETSTA 7 PLAY\r\n", a3c.w[4])
+ReceivedFromProxy(5003, "OFF", {})
+a3c.h.OnConnect(a3c)
+assert(a3c.w[1] == "o1 REMSTR 7\r\n", a3c.w[1])
+print("SET_INPUT stream ok")

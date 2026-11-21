@@ -51,16 +51,26 @@ MODELS = {
 }
 
 
-def conn(cid, name, ctype, consumer, asrc, vsrc, line, classes, proxy=None, hidden=False, autobind=False):
+AV_PROXY = 5003  # the box's audio avswitch proxy (audio.lua's PROXY)
+
+
+def conn(cid, name, ctype, consumer, asrc, vsrc, line, classes, proxy=None, hidden=False, autobind=False,
+         extra=None):
     pb = f' proxybindingid="{proxy}"' if proxy else ""
     cls = "".join(f"<class>{'<autobind>True</autobind>' if autobind else ''}"
                   f"<classname>{c}</classname></class>" for c in classes)
     h = "<hidden>True</hidden>" if hidden else ""
+    x = f"<ExtraInfo>{extra}</ExtraInfo>" if extra is not None else ""
     return (f'    <connection{pb}><id>{cid}</id><facing>6</facing>'
             f'<connectionname>{name}</connectionname><type>{ctype}</type>'
             f'<consumer>{consumer}</consumer><audiosource>{asrc}</audiosource>'
             f'<videosource>{vsrc}</videosource><linelevel>{line}</linelevel>'
-            f'<classes>{cls}</classes>{h}</connection>')
+            f'{x}<classes>{cls}</classes>{h}</connection>')
+
+
+def audio_classes(label):
+    """Stock controller classes: coax is DIGITAL_COAX, everything else STEREO."""
+    return ["DIGITAL_COAX"] if "Coax" in label else ["STEREO"]
 
 
 def connections(m):
@@ -69,33 +79,47 @@ def connections(m):
     out.append(conn(5001, "Controller", 2, "False", "False", "False", "False", ["CONTROLLER"], hidden=True))
     if m["nav"]:
         out.append(conn(5002, "UI Device", 2, "False", "False", "False", "False", ["UI_DEVICE"], hidden=True))
-    # Each audio output is its own Control4 streaming zone: a DIGITAL_AUDIO_CLIENT
-    # input (3003+) paired with the physical output. EA3 (analog+coax+HDMI) = 3
-    # streams, EA1 (HDMI only) = 1 — one per output, as the box plays each.
-    outputs = [(f"Audio Output {i + 1} ({lbl})", 4000 + i, ["STEREO", "SPEAKER"], "True", "False")
+    # The box's audio lives on its own avswitch proxy (5003), declared like the
+    # proven c4-audio-client.c4z: one DIGITAL_AUDIO_CLIENT (3003) → the outputs →
+    # a Room Selection per output (7000+i, selection + volume). On the controller
+    # proxy the Director never paths Digital Media to a DriverWorks driver's outputs
+    # ("FindShortestPath: Path not found"); on an avswitch it does. Outputs follow
+    # control4_ea3.c4i: analog STEREO, coax DIGITAL_COAX, HDMI last.
+    av = AV_PROXY if m["client"] else 5001
+    if m["client"]:
+        out.append(conn(AV_PROXY, "Audio", 2, "False", "False", "False", "False", ["AVSWITCH"], hidden=True))
+        out.append(conn(3003, "Digital Audio Client", 6, "True", "False", "False",
+                        "True", ["DIGITAL_AUDIO_CLIENT"], proxy=AV_PROXY, autobind=True))
+    outputs = [(f"Audio Output {i + 1} ({lbl})", 4000 + i, audio_classes(lbl), "Coax" in lbl, False)
                for i, lbl in enumerate(m["aout"])]
     if m["hdmi"]:
-        outputs.append(("HDMI (Audio/Video)", 4072, ["HDMI"], "True", "True"))
-    for idx, (nm, oid, classes, asrc, vsrc) in enumerate(outputs):
+        outputs.append(("HDMI (Audio/Video)", 4072, ["HDMI"], True, True))
+    for idx, (nm, oid, classes, line, vsrc) in enumerate(outputs):
+        out.append(conn(oid, nm, 6, "False", "True", str(vsrc), str(line), classes, proxy=av, extra=idx))
         if m["client"]:
-            out.append(conn(3100 + idx, f"Digital Audio Client {idx + 1} ({nm})", 6, "True", "False", "False",
-                            "True", ["DIGITAL_AUDIO_CLIENT"], proxy=5001, autobind=(idx == 0)))
-        out.append(conn(oid, nm, 6, "False", asrc, vsrc, "True", classes, proxy=5001))
+            short = nm.split(" (")[0] if oid != 4072 else "HDMI Audio"
+            out.append(conn(7000 + idx, f"{short} Room Selection", 7, "False", "True", "False", "True",
+                            ["AUDIO_SELECTION", "AUDIO_VOLUME"], proxy=AV_PROXY))
     for i, label in enumerate(m["video"]):
         out.append(conn(4200 + i, f"{label} Video", 6, "False", "False", "True", "False",
                         [label.upper()], proxy=5001))
     # Physical audio inputs (3001+, family convention — same as openSpeakerPoint's
-    # line-in). Declared for binding a source; no Lua behavior yet. Streaming
-    # endpoints live at 3100+ so they never collide with these.
+    # line-in), skipping 3003, the streaming client. Declared for binding a source;
+    # no Lua behavior yet.
+    ids = [c for c in range(3001, 3010) if c != 3003]
     for i, label in enumerate(m["ain"]):
-        out.append(conn(3001 + i, f"Audio Input {i + 1} ({label})", 6, "True", "False", "False", "True",
-                        ["STEREO", "RCA_IN"], proxy=5001))
+        out.append(conn(ids[i], f"Audio Input {i + 1} ({label})", 6, "True", "False", "False", "True",
+                        audio_classes(label), proxy=5001, extra=i))
     if m["nav"]:
         out.append(conn(7500, "Onscreen Navigator", 7, "False", "False", "False", "False",
                         ["ONSCREEN_SELECTION"], proxy=5001))
     # The box address (SDDP fills it) + MQTT/navigator ports.
     ports = '<port><name>Navigator</name><number>9010</number></port>' if m["nav"] else ""
-    ports += '<port><name>Audioclient</name><number>6100</number><delimiter>0d0a</delimiter></port>' if m["client"] else ""
+    # Director keeps :6100 open itself (as c4-audio-client.c4z does): that connection
+    # is what brings the device online, and only an online client gets addcli'd.
+    ports += ('<port><name>Audioclient</name><number>6100</number><auto_connect>True</auto_connect>'
+              '<monitor_connection>True</monitor_connection><keep_connection>True</keep_connection>'
+              '<keep_alive>True</keep_alive><delimiter>0d0a</delimiter></port>') if m["client"] else ""
     out.append(f'    <connection><id>6001</id><facing>6</facing><connectionname>{m["name"]}</connectionname>'
                f'<type>4</type><consumer>True</consumer><audiosource>False</audiosource>'
                f'<videosource>False</videosource><linelevel>True</linelevel>'
@@ -109,16 +133,25 @@ def connections(m):
 
 
 def driver_xml(slug, m):
-    caps = ""
+    caps = []
     proxies = '    <proxy proxybindingid="5001" primary="True" name="%s">controller</proxy>' % m["name"]
     if m["nav"]:
-        caps = ("  <capabilities>\n"
-                "    <has_video_output>true</has_video_output>\n"
-                "    <has_ui_device>true</has_ui_device>\n"
-                "    <has_navigator>true</has_navigator>\n"
-                '    <auto_bind_onscreen_selection proxybindingid="5001">true</auto_bind_onscreen_selection>\n'
-                "  </capabilities>\n\n")
+        caps += ["<has_video_output>true</has_video_output>", "<has_ui_device>true</has_ui_device>",
+                 "<has_navigator>true</has_navigator>",
+                 '<auto_bind_onscreen_selection proxybindingid="5001">true</auto_bind_onscreen_selection>']
         proxies += '\n    <proxy proxybindingid="5002">uidevice</proxy>'
+    if m["client"]:
+        # The audio avswitch (see connections()), with c4-audio-client.c4z's caps.
+        n = len(m["aout"]) + int(m["hdmi"])
+        caps += ["<can_switch>True</can_switch>", "<has_discrete_volume_control>True</has_discrete_volume_control>",
+                 "<has_up_down_volume_control>True</has_up_down_volume_control>",
+                 "<has_discrete_mute_control>True</has_discrete_mute_control>",
+                 "<has_toggle_mute_control>True</has_toggle_mute_control>",
+                 "<has_discrete_input_select>True</has_discrete_input_select>",
+                 "<audio_consumer_count>1</audio_consumer_count>",
+                 f"<audio_provider_count>{n}</audio_provider_count>"]
+        proxies += f'\n    <proxy proxybindingid="{AV_PROXY}" name="{m["name"]} Audio">avswitch</proxy>'
+    caps = ("  <capabilities>\n" + "".join(f"    {c}\n" for c in caps) + "  </capabilities>\n\n") if caps else ""
     props = """    <properties>
       <property><name>openHC Web UI</name><type>LINK</type><default></default>
         <tooltip>The box's own dashboard (:80). Filled in once the box address resolves.</tooltip></property>

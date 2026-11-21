@@ -27,7 +27,7 @@
 
 -- MAX_PLAIN = how many non-HDMI audio outputs this model has (OHC_AUDIO_PLAIN,
 -- baked per model by gen.py); they occupy 4000..4000+N-1, HDMI is 4072.
-local PROXY, HDMI, FIRST, MAX_PLAIN, STEP = 5001, 4072, 4000, OHC_AUDIO_PLAIN or 3, 2
+local PROXY, HDMI, FIRST, MAX_PLAIN, STEP = 5003, 4072, 4000, OHC_AUDIO_PLAIN or 3, 2
 
 local gOutputs = {}               -- connection id -> audiod output id
 local gLevel, gMuted, gRamp = {}, {}, {}
@@ -115,9 +115,79 @@ function OHC_STATE(rest, payload)
   if prevState then prevState(rest, payload) end
 end
 
+-- ---- the stream: audio3server on this Director -> the box's client ----------------
+-- Director routes a room to this avswitch (SET_INPUT) but never addcli's a
+-- DriverWorks client itself — it does that only for real Control4 controllers. The
+-- driver runs on the Director, so it does it: a stream on the local audio3server,
+-- the box's zone for the output subscribed, played; removed when the room goes OFF.
+-- Zones follow c4zones: non-HDMI outputs 6200.., HDMI 6203.
+-- ponytail: the media is ShairBridge's PCM (AirPlay through Control4), the one source
+-- wired so far; other Digital Media sources need their URL from the session.
+OHC_A3_URL = "c4audio://director:6733?fmt=s16le&fmt.channels=2&fmt.sample_rate=44100"
+local gSid
+
+local function zone_of(output)
+  output = tonumber(output) or FIRST
+  if output >= 7000 then output = output - 3000 end   -- a Room Selection names its output
+  return output == HDMI and 6203 or 6200 + (output - FIRST)
+end
+
+-- Run audio3server commands in order; each is a function of the stream id so far.
+local function a3(cmds, done)
+  local i, sid, buf = 0, gSid, ""
+  local function step(c)
+    i = i + 1
+    if not cmds[i] then c:Close(); if done then done(sid) end; return end
+    c:Write("o" .. i .. " " .. cmds[i](sid) .. "\r\n")
+  end
+  C4:CreateTCPClient()
+    :OnConnect(function(c) step(c); c:ReadAtLeast(1) end)
+    :OnRead(function(c, data)
+      buf = buf .. data
+      for line in buf:gmatch("([^\r\n]*)\r?\n") do
+        sid = sid or line:match("^o1 ADDSTR STREAM=(%d+)")
+        if line:match("^o" .. i .. " OK") or line:match("^o" .. i .. " NO") or line:match("^o" .. i .. " BAD") then
+          step(c)
+        end
+      end
+      buf = buf:match("[^\n]*$")
+      c:ReadAtLeast(1)
+    end)
+    :Connect("127.0.0.1", 6000)
+end
+
+local function stop_stream()
+  if gSid then local sid = gSid; gSid = nil; a3({ function() return "REMSTR " .. sid end }) end
+end
+
+local function start_stream(output)
+  local ip = Properties["Target IP Address"] or ""
+  if ip == "" then return end
+  stop_stream()
+  a3({ function() return "ADDSTR" end,
+       function(sid) return "ADDMED " .. sid .. " " .. OHC_A3_URL end,
+       function(sid) return "ADDCLI " .. sid .. " " .. ip .. " " .. zone_of(output) end,
+       function(sid) return "SETSTA " .. sid .. " PLAY" end },
+     function(sid) gSid = sid; C4:UpdateProperty("Last IO Command", "audio stream " .. tostring(sid) .. " -> " .. ip .. ":" .. zone_of(output)) end)
+end
+
 -- ---- Director -> box -----------------------------------------------------------
 local prevReceivedFromProxy = ReceivedFromProxy
 function ReceivedFromProxy(idBinding, strCommand, tParams)
+  -- The audio avswitch has one input (the 3003 client) wired to every output. Confirm
+  -- the switch (Director waits for it) and start the stream to the box.
+  if idBinding == PROXY and strCommand == "SET_INPUT" then
+    C4:SendToProxy(PROXY, "INPUT_OUTPUT_CHANGED", { INPUT = tParams.INPUT, OUTPUT = tParams.OUTPUT }, "NOTIFY")
+    start_stream(tParams.OUTPUT)
+    return
+  end
+  if idBinding == PROXY and (strCommand == "OFF" or strCommand == "DISCONNECT_OUTPUT") then
+    stop_stream()
+    return
+  end
+  if idBinding == PROXY and (strCommand == "ON" or strCommand == "CONNECT_OUTPUT") then
+    return   -- nothing to power or patch on the box
+  end
   local b = tParams and tonumber(tParams.OUTPUT)
   local run = idBinding == PROXY and COMMANDS[strCommand]
   if run and b and gOutputs[b] then
