@@ -52,7 +52,10 @@ fn toml(zones: &[(u16, String, String)]) -> String {
     let q = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
     let mut s = String::from(
         "# Written by openhc-control4's c4zones from audiod's outputs; regenerated at every start.\n\
-         control = \"0.0.0.0:6100\"\napi = \"127.0.0.1:6180\"\nsddp = false\n",
+         control = \"0.0.0.0:6100\"\napi = \"127.0.0.1:6180\"\nsddp = false\n\
+         # Jitter buffer: Control4's 1200 ms default put AirPlay video ~1 s out of sync\n\
+         # and kept playing after pause; 250 ms is ample on a wired LAN with RTX on.\n\
+         latency_ms = 250\n",
     );
     for (port, label, pcm) in zones {
         s += &format!("\n[[zone]]\nport = {port}\nname = \"{}\"\ndevice = \"{}\"\nvolume = 100\n", q(label), q(pcm));
@@ -113,7 +116,7 @@ mod tests {
         let got: Vec<(u16, &str)> = z.iter().map(|(p, _, pcm)| (*p, pcm.as_str())).collect();
         assert_eq!(got, [(6200, "ohc_analog1"), (6201, "ohc_analog2"), (6202, "ohc_coax"), (6203, "ohc_hdmi")]);
         let t = toml(&z);
-        assert!(t.contains("sddp = false") && t.contains("name = \"Coax (S/PDIF)\"") && t.contains("volume = 100"));
+        assert!(t.contains("latency_ms = 250") && t.contains("sddp = false") && t.contains("name = \"Coax (S/PDIF)\"") && t.contains("volume = 100"));
     }
 
     #[test]
