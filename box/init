@@ -13,12 +13,19 @@
 # audio output openHC's audiod reports, each playing into that output's shared
 # PCM (ohc_<id>, a dmix), so it mixes with AirPlay/Spotify and the navigator.
 # c4zones rewrites its config from audiod's outputs every time it starts.
+# A second c4sddp announces the audio client as a Control4 Triad One
+# (c4:triad_one): added in Composer with Control4's own native driver, that
+# device is a real Digital Media endpoint, so every Control4 source (TuneIn,
+# My Music, ShairBridge, ...) streams to the box with no per-source driver.
+# (Director only hands streams to native drivers; a Lua driver can't report
+# the client's address, see README.)
 #
 # Overrides (SINK_ADDR, HTTP_ADDR, C4_WALLPAPER, ...) in c4nav.conf next to this.
 D=$(cd "$(dirname "$0")" && pwd)
 PIDF=/run/c4nav.pid
 SDDP_PIDF=/run/c4sddp.pid
 AUDIO_PIDF=/run/c4audio.pid
+AUDIO_SDDP_PIDF=/run/c4sddp-audio.pid
 URL=http://localhost:8090/
 
 export SINK_ADDR=0.0.0.0:9010 HTTP_ADDR=127.0.0.1:8090 WEB_DIR=$D/www
@@ -34,12 +41,13 @@ case "$1" in
 			logger -t c4audio "no GStreamer in this openHC image (the gstreamer feature): no audio client"
 		else
 			start-stop-daemon -S -q -b -m -p $AUDIO_PIDF -x /bin/sh -- "$0" audio
+			start-stop-daemon -S -q -b -m -p $AUDIO_SDDP_PIDF -x /bin/sh -- "$0" sddp-audio
 		fi
 		;;
 	stop)
-		for p in $PIDF $SDDP_PIDF $AUDIO_PIDF; do [ -f $p ] && start-stop-daemon -K -q -p $p; done
+		for p in $PIDF $SDDP_PIDF $AUDIO_PIDF $AUDIO_SDDP_PIDF; do [ -f $p ] && start-stop-daemon -K -q -p $p; done
 		killall -q c4nav c4sddp c4-audio-client 2>/dev/null
-		rm -f $PIDF $SDDP_PIDF $AUDIO_PIDF
+		rm -f $PIDF $SDDP_PIDF $AUDIO_PIDF $AUDIO_SDDP_PIDF
 		;;
 	restart)
 		"$0" stop; sleep 1; "$0" start ;;
@@ -81,6 +89,9 @@ case "$1" in
 			*)     slug="${OHC_MODEL:-device}"; model="${OHC_MODEL:-controller}" ;;
 		esac
 		while :; do $D/bin/c4sddp "$slug" "openHC $model" 2>&1 | logger -t c4sddp; sleep 3; done ;;
+	sddp-audio)
+		# Its first zone (6200) is the Triad One's one output (Audio Output 7000).
+		while :; do $D/bin/c4sddp c4:triad_one "openHC Audio" control4_tr1.c4i 2>&1 | logger -t c4sddp; sleep 3; done ;;
 	audio)
 		# c4zones: 0 = zones written, 3 = no named outputs on this board, else audiod not up.
 		while :; do
