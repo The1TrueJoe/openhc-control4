@@ -10,7 +10,9 @@
 //!   HDMI                         HDMI (Audio/Video) (4072)        port  6203
 //!
 //! (Director numbers a device's audio outputs 6200 + their index, and 4072
-//! comes after 4000..4002.) The driver's io.lua applies the same rule to
+//! comes after 4000..4002.) Port 6200 is also where the box's Triad One
+//! identity plays (that driver has one output), so a board with no plain
+//! output (HDMI only) gets its first output at 6200 as well. The driver's io.lua applies the same rule to
 //! audiod's `state/audio/map`. Volume belongs to audiod (its per-output
 //! level), so every zone starts at 100.
 //!
@@ -45,6 +47,9 @@ fn zones(outputs: &[Value]) -> Vec<(u16, String, String)> {
         v.push((port, label, pcm.to_string()));
     }
     v.sort();
+    if let Some(first) = v.first().cloned().filter(|z| z.0 != 6200) {
+        v.insert(0, (6200, first.1, first.2));
+    }
     v
 }
 
@@ -122,6 +127,7 @@ mod tests {
     #[test]
     fn hdmi_only_board_still_lands_on_4072s_port() {
         let v: Value = serde_json::from_str(r#"[{"id":"hdmi","label":"HDMI","pcm":"ohc_hdmi"}]"#).unwrap();
-        assert_eq!(zones(v.as_array().unwrap())[0].0, 6203);
+        let z = zones(v.as_array().unwrap());
+        assert_eq!(z.iter().map(|z| (z.0, z.2.as_str())).collect::<Vec<_>>(), [(6200, "ohc_hdmi"), (6203, "ohc_hdmi")]);
     }
 }

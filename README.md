@@ -53,7 +53,8 @@ for its display and storage.
    Digital Media source): add the second discovered device the box announces,
    a **Triad One** (Control4's own driver, no download). Make its **Audio
    Output** the room's Audio End-Point. It plays out the box's first audio
-   output (analog on an EA-3).
+   output: analog on the EA-3 and EA-5, Analog 1 on the HC-800, HDMI on the
+   EA-1. Every board with digital audio in the table above announces it.
 
 The driver lists every board's connections, so leave the ones your box doesn't
 have unbound. Its Documentation tab shows the box's own openHC dashboard.
