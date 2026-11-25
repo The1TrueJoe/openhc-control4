@@ -50,11 +50,15 @@ for its display and storage.
 4. Bind what the box has: HDMI to the TV for the navigator, the audio outputs to
    rooms, and the relays, contacts, IR and serial ports like a controller's own.
 5. For Control4 music (TuneIn, My Music, AirPlay through ShairBridge, any
-   Digital Media source): add the second discovered device the box announces,
-   a **Triad One** (Control4's own driver, no download). Make its **Audio
-   Output** the room's Audio End-Point. It plays out the box's first audio
-   output: analog on the EA-3 and EA-5, Analog 1 on the HC-800, HDMI on the
-   EA-1. Every board with digital audio in the table above announces it.
+   Digital Media source), add the box a second time from the discovered
+   devices, as the Control4 controller it is: **EA-1**, **EA-3**, **EA-5** or
+   **HC-800**, with Control4's own driver (no download). Make its AUDIO OUT,
+   DIGITAL AUDIO OUT or HDMI AUDIO OUT End-Point a room's Audio End-Point.
+   Composer shows that device as offline (it wants Control4's own services);
+   the audio plays regardless.
+   If your controller's OS no longer has that model's driver, add the
+   discovered **Triad One** instead. It has one output: the box's first
+   (analog on the EA-3 and EA-5, Analog 1 on the HC-800, HDMI on the EA-1).
 
 The driver lists every board's connections, so leave the ones your box doesn't
 have unbound. Its Documentation tab shows the box's own openHC dashboard.
@@ -72,12 +76,11 @@ No to keep the token on the controller.
 
 - Digital audio through `openhc.c4z` itself. Director only hands a stream to a
   driver that can report the client's address, and only Control4's compiled
-  drivers can, so a Lua driver never gets one. Instead, the box also announces
-  itself as a Control4 Triad One and the stock Triad One driver does the
-  reporting. Proven on an EA-3 Director: TuneIn-style radio and ShairBridge
-  AirPlay both stream to the box with nothing per source. That covers one
-  output; the coax and HDMI outputs still go through `openhc.c4z`'s own
-  stream, which only knows ShairBridge.
+  drivers can, so a Lua driver never gets one. The box therefore also
+  announces itself to Control4's own drivers (its model, and a Triad One).
+  Proven on an EA-3 Director with an EA-3 box: radio and ShairBridge AirPlay
+  play out the analog, coax and HDMI outputs with nothing per source. The
+  EA-1, EA-5 and HC-800 identities are untested on hardware.
 - Which commands Director sends for IR and serial, and for a controller's own
   output volume. The driver's **Last IO Command** property shows what arrives.
 

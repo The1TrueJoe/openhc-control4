@@ -46,6 +46,15 @@ fn zones(outputs: &[Value]) -> Vec<(u16, String, String)> {
         };
         v.push((port, label, pcm.to_string()));
     }
+    // Control4's own controller drivers number HDMI right after the plain
+    // outputs (a stock EA-3 is 6200 analog, 6201 coax, 6202 HDMI), so HDMI
+    // also answers there when that port is free.
+    if let Some(h) = v.iter().find(|z| z.0 == HDMI_PORT).cloned() {
+        let native = 6200 + plain as u16;
+        if native != HDMI_PORT && !v.iter().any(|z| z.0 == native) {
+            v.push((native, h.1, h.2));
+        }
+    }
     v.sort();
     if let Some(first) = v.first().cloned().filter(|z| z.0 != 6200) {
         v.insert(0, (6200, first.1, first.2));
@@ -129,5 +138,13 @@ mod tests {
         let v: Value = serde_json::from_str(r#"[{"id":"hdmi","label":"HDMI","pcm":"ohc_hdmi"}]"#).unwrap();
         let z = zones(v.as_array().unwrap());
         assert_eq!(z.iter().map(|z| (z.0, z.2.as_str())).collect::<Vec<_>>(), [(6200, "ohc_hdmi"), (6203, "ohc_hdmi")]);
+    }
+
+    #[test]
+    fn ea3_hdmi_also_on_the_stock_ea3_port() {
+        let v: Value = serde_json::from_str(r#"[{"id":"analog","pcm":"ohc_analog"},{"id":"coax","pcm":"ohc_coax"},{"id":"hdmi","pcm":"ohc_hdmi"}]"#).unwrap();
+        let z = zones(v.as_array().unwrap());
+        assert_eq!(z.iter().map(|z| (z.0, z.2.as_str())).collect::<Vec<_>>(),
+            [(6200, "ohc_analog"), (6201, "ohc_coax"), (6202, "ohc_hdmi"), (6203, "ohc_hdmi")]);
     }
 }
