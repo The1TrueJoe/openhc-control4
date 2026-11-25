@@ -8,11 +8,7 @@
 //! start, so this restarts it when the box's address changes (a new DHCP lease
 //! after a reboot or a move to Wi-Fi), and waits while there is none.
 //!
-//! Usage: c4sddp <slug> [display-model] [driver]
-//!
-//! A slug with a colon is a full SDDP Type, announced as-is with the given
-//! driver (e.g. `c4:triad_one "openHC Audio" control4_tr1.c4i`): a second
-//! identity, so Control4's own native driver can be bound to this box.
+//! Usage: c4sddp <slug> [display-model]
 //!
 //! One SDDP Type per openHC model — `openhc:<slug>` (openhc:ea3, openhc:hc800,
 //! openhc:iox, …) — matching that model's driver `<search_types>`. Control4
@@ -35,14 +31,14 @@ fn my_ip() -> Option<Ipv4Addr> {
     }
 }
 
-async fn announce(ip: Ipv4Addr, host: &str, ty: &str, model: &str, driver: &str) -> std::io::Result<sddp::Announcer> {
-    sddp::Announcer::builder(host, ty)
+async fn announce(ip: Ipv4Addr, host: &str, slug: &str, model: &str) -> std::io::Result<sddp::Announcer> {
+    sddp::Announcer::builder(host, &format!("openhc:{slug}"))
         .interface(ip)
         .primary_proxy("controller")
         .proxies(["controller"])
         .manufacturer("openHC")
         .model(model)
-        .driver(driver)
+        .driver(&format!("openhc-{slug}.c4z"))
         .config_url(format!("http://{ip}/"))
         .start()
         .await
@@ -52,11 +48,6 @@ async fn announce(ip: Ipv4Addr, host: &str, ty: &str, model: &str, driver: &str)
 async fn main() {
     let slug = std::env::args().nth(1).unwrap_or_else(|| "device".into());
     let model = std::env::args().nth(2).unwrap_or_else(|| format!("openHC {slug}"));
-    let (ty, driver) = if slug.contains(':') {
-        (slug.clone(), std::env::args().nth(3).unwrap_or_default())
-    } else {
-        (format!("openhc:{slug}"), format!("openhc-{slug}.c4z"))
-    };
     let host = std::fs::read_to_string("/proc/sys/kernel/hostname")
         .map(|h| h.trim().to_string())
         .unwrap_or_else(|_| "openhc".into());
@@ -70,7 +61,7 @@ async fn main() {
         if current.as_ref().map(|(a, _)| *a) != ip {
             current = None;
             if let Some(ip) = ip {
-                match announce(ip, &host, &ty, &model, &driver).await {
+                match announce(ip, &host, &slug, &model).await {
                     Ok(a) => current = Some((ip, a)),
                     Err(e) => eprintln!("c4sddp: announcing from {ip}: {e}"),
                 }

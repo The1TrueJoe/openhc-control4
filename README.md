@@ -13,8 +13,9 @@ and one Control4 driver, `openhc.c4z`, gives Director what they have:
 
 - **IO:** relays, contacts, IR outputs and serial ports, as ordinary Control4
   connections.
-- **Digital audio:** Control4's Digital Media streams to the box's audio
-  outputs, one stream per output, using
+- **Digital audio:** every Control4 source (TuneIn, My Music, AirPlay through
+  ShairBridge, ...) plays on the box's audio outputs, managed by Director like
+  a Control4 controller's own, using
   [control4-audio-client](https://github.com/The1TrueJoe/control4-audio-client).
 - **On-screen navigator:** a 10-ft UI on the TV, driven by the room's remote and
   showing your project.
@@ -47,18 +48,16 @@ for its display and storage.
 3. Add the openHC box from the discovered devices. It fills in its own address.
    On the HC-250, CA-1 and IO Extender, enter the address on the Network tab
    instead.
-4. Bind what the box has: HDMI to the TV for the navigator, the audio outputs to
-   rooms, and the relays, contacts, IR and serial ports like a controller's own.
-5. For Control4 music (TuneIn, My Music, AirPlay through ShairBridge, any
-   Digital Media source), add the box a second time from the discovered
-   devices, as the Control4 controller it is: **EA-1**, **EA-3**, **EA-5** or
-   **HC-800**, with Control4's own driver (no download). Make its AUDIO OUT,
-   DIGITAL AUDIO OUT or HDMI AUDIO OUT End-Point a room's Audio End-Point.
-   Composer shows that device as offline (it wants Control4's own services);
-   the audio plays regardless.
-   If your controller's OS no longer has that model's driver, add the
-   discovered **Triad One** instead. It has one output: the box's first
-   (analog on the EA-3 and EA-5, Analog 1 on the HC-800, HDMI on the EA-1).
+4. Bind what the box has: HDMI to the TV for the navigator, and the relays,
+   contacts, IR and serial ports like a controller's own.
+5. The driver adds the box's audio as a second device, **"<name> Audio"**, in
+   the same room, using Control4's own driver for that model (EA-1, EA-3, EA-5,
+   HC-800; the Triad One on the HC-250, or on a controller whose OS no longer
+   has the model's driver), and points it at the box. If the room has no audio
+   yet, its first output becomes the room's Audio End-Point. Bind its outputs
+   like any controller's: AUDIO OUT, DIGITAL AUDIO OUT, HDMI AUDIO OUT. Composer
+   shows that device as offline (it looks for Control4's own services on the
+   box); the audio plays regardless.
 
 The driver lists every board's connections, so leave the ones your box doesn't
 have unbound. Its Documentation tab shows the box's own openHC dashboard.
@@ -74,13 +73,13 @@ No to keep the token on the controller.
 
 ## Not yet confirmed
 
-- Digital audio through `openhc.c4z` itself. Director only hands a stream to a
-  driver that can report the client's address, and only Control4's compiled
-  drivers can, so a Lua driver never gets one. The box therefore also
-  announces itself to Control4's own drivers (its model, and a Triad One).
-  Proven on an EA-3 Director with an EA-3 box: radio and ShairBridge AirPlay
-  play out the analog, coax and HDMI outputs with nothing per source. The
-  EA-1, EA-5 and HC-800 identities are untested on hardware.
+- Digital audio on the EA-1, EA-5, HC-800 and HC-250. Director only streams to a
+  device whose driver can report the audio client's address, and only
+  Control4's compiled drivers can, so `child.lua` adds one: Control4's driver
+  for the model, pointed at the box through Director's own identify call. On an
+  EA-3, every output played radio and ShairBridge AirPlay with nothing per
+  source. The other models' outputs follow the port numbering of their
+  Control4 drivers (see `c4zones`), untested on hardware.
 - Which commands Director sends for IR and serial, and for a controller's own
   output volume. The driver's **Last IO Command** property shows what arrives.
 
@@ -97,7 +96,7 @@ driver/package.sh && (cd driver && lua test.lua)
 
 | Path | What |
 |---|---|
-| `driver/` | the Control4 driver: the navigator (from control4-navigator-sink-lib), `io.lua`, `audio.lua` |
+| `driver/` | the Control4 driver: the navigator (from control4-navigator-sink-lib), `io.lua`, `child.lua` (the audio device), `zigbee.lua` |
 | `navigator/` | submodule: control4-fake-navigator, the on-screen UI and its backend |
 | `audio-client/` | submodule: control4-audio-client |
 | `tools/` | box helpers: `c4sddp` (discovery, with the [sddp](https://github.com/The1TrueJoe/sddp) crate) and `c4zones` (audio zones from openHC's outputs) |

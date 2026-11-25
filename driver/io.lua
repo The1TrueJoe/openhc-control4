@@ -70,7 +70,7 @@ local function publish(topic, payload)
   gMqtt:Write(C4MQTT.publish(gBase .. "/" .. topic, payload))
 end
 
--- For the layers appended after this one (audio.lua): publish under the box's base.
+-- For the layers appended after this one (zigbee.lua): publish under the box's base.
 OHC_PUBLISH = publish
 
 -- ---- iod -> Director ----------------------------------------------------------
@@ -92,7 +92,7 @@ local function on_publish(topic, payload)
     gState[kind .. "/" .. label] = payload
     notify(kind, tonumber(label))
   elseif OHC_STATE then
-    OHC_STATE(rest, payload) -- the rest of the box's state (audio.lua)
+    OHC_STATE(rest, payload) -- the rest of the box's state (zigbee.lua)
   end
 end
 
@@ -225,7 +225,10 @@ end
 
 function OnPropertyChanged(strProperty)
   navOnPropertyChanged(strProperty)
-  if strProperty == "Target IP Address" then show_web_ui() end
+  if strProperty == "Target IP Address" then
+    show_web_ui()
+    if OHC_AUDIO_CHILD then OHC_AUDIO_CHILD() end
+  end
   if strProperty == "Target IP Address" or strProperty == "IO Port"
     or strProperty == "IO Token" or strProperty == "Topic Prefix" then
     mqtt_connect()
@@ -237,6 +240,7 @@ function OnDriverLateInit()
   show_web_ui()
   navOnDriverLateInit()
   mqtt_connect()
+  if OHC_AUDIO_CHILD then OHC_AUDIO_CHILD() end
   -- PINGREQ well inside the 60 s keepalive.
   C4:SetTimer(30000, function() if gMqttUp then gMqtt:Write(string.char(0xC0, 0)) end end, true)
 end

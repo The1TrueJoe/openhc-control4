@@ -31,6 +31,13 @@ C4 = {
   AddVariable = function(_, k, v) Vars = Vars or {}; Vars[k] = v; return true end,
   SetVariable = function(_, k, v) Vars[k] = v end,
   url = function() error("token minting is off in this test") end,
+  -- child.lua: the audio child is added at late init (asserted further down).
+  PersistGetValue = function(_, k) return Persist and Persist[k] end,
+  PersistSetValue = function(_, k, v) Persist = Persist or {}; Persist[k] = v end,
+  GetDeviceDisplayName = function(_, id) return id == 42 and "openHC EA3" or (id == 100 and "openHC EA3 Audio") or nil end,
+  RoomGetId = function() return 36 end,
+  AddDevice = function(_, c4i, room, name, cb) Added = { c4i = c4i, room = room, name = name, cb = cb } end,
+  RenameDevice = function(_, id, name) Renamed = id .. " " .. name end,
 }
 
 dofile("build/ea3/driver.lua")
@@ -80,18 +87,6 @@ assert(last() == before, "EA3 has no IR 7")
 ReceivedFromProxy(3, "SEND_STRING", { STRING = "hi" })
 assert(last() == pub("openhc/ea3/cmd/serial/3/write", "hi"))
 
--- Audio: audiod's retained output map (HDMI last). EA3 has 2 non-HDMI outs
--- (OHC_AUDIO_PLAIN=2): analog -> 4000, coax -> 4001, HDMI -> 4072.
-C4.JsonDecode = function() return { outputs = {
-  { id = "analog" }, { id = "coax" }, { id = "hdmi" } } } end
-local reports = {}
-C4.SendToProxy = function(_, id, cmd, p) reports[#reports + 1] = cmd .. " " .. tostring(p and (p.LEVEL or p.MUTE)) end
-mqtt.h.OnRead(mqtt, pub("openhc/ea3/state/audio/map", "{}"))
-ReceivedFromProxy(5003, "SET_VOLUME_LEVEL", { OUTPUT = "4072", LEVEL = "40" })
-assert(last() == pub("openhc/ea3/cmd/audio/level/hdmi", "40"), hex(last()))
-ReceivedFromProxy(5003, "PULSE_VOL_UP", { OUTPUT = "4001" })
-assert(last() == pub("openhc/ea3/cmd/audio/level/coax", "2"))
-
 -- Non-IO bindings still reach the navigator half (it answers this one).
 local sent
 C4.SendToProxy = function(_, id, cmd) sent = id .. " " .. cmd end
@@ -121,26 +116,39 @@ print("zigbee.lua: ok (ea3 zap bridge)")
 assert(Vars.OPENHC_ADDRESS == "10.0.0.9", tostring(Vars.OPENHC_ADDRESS))
 print("OPENHC_ADDRESS ok")
 
--- The audio avswitch confirms an input switch, or Director never starts the stream.
--- ... and the driver starts the stream itself on the Director's audio3server.
-local confirm, a3c
-C4.SendToProxy = function(_, id, cmd) confirm = id .. " " .. cmd end
-local mk = C4.CreateTCPClient
-C4.CreateTCPClient = function()
-  a3c = mk(); a3c.w = {}; a3c.Write = function(self, b) self.w[#self.w + 1] = b end; return a3c
+-- The audio child: late init added Control4's own EA-3 driver in the same room.
+assert(Added and Added.c4i == "control4_ea3.c4i" and Added.room == 36 and Added.name == "openHC EA3 Audio",
+  tostring(Added and Added.c4i))
+-- Director adds it (protocol 100, proxy 101): its first output becomes the room's
+-- Audio End-Point (the room has none), and it is pointed at the box's IP.
+local bound, posts = nil, {}
+C4.GetBoundProviderDevice = function() return 0 end
+C4.Bind = function(_, pd, pb, cd, cb, cls) bound = table.concat({ pd, pb, cd, cb, cls }, " ") end
+C4.GetNetworkBindingsByDevice = function() return { networkbindings = { { addr = "" } } } end
+C4.url = function()
+  local u, done = {}, nil
+  function u:SetOptions() return self end
+  function u:OnDone(f) done = f; return self end
+  function u:Post(url, body)
+    posts[#posts + 1] = url .. " " .. body
+    done(nil, { { code = 200, body = url:match("localjwt") and '{"token":"t0k"}' or '{"status":"Sent"}' } })
+  end
+  return u
 end
-ReceivedFromProxy(5003, "SET_INPUT", { INPUT = "3003", OUTPUT = "4000" })
-assert(confirm == "5003 INPUT_OUTPUT_CHANGED", tostring(confirm))
-assert(a3c.ip == "127.0.0.1" and a3c.port == 6000)
-a3c.h.OnConnect(a3c)
-assert(a3c.w[1] == "o1 ADDSTR\r\n", a3c.w[1])
-a3c.h.OnRead(a3c, "o1 ADDSTR STREAM=7\r\no1 OK ADDSTR\r\n")
-assert(a3c.w[2] == "o2 ADDMED 7 " .. OHC_A3_URL .. "\r\n", a3c.w[2])
-a3c.h.OnRead(a3c, "o2 ADDMED MID=7:1\r\no2 OK ADDMED\r\n")
-assert(a3c.w[3] == "o3 ADDCLI 7 10.0.0.9 6200\r\n", a3c.w[3])
-a3c.h.OnRead(a3c, "o3 OK ADDCLI\r\n* SYS STREAM=7:1 x\r\no4 OK SETSTA\r\n")
-assert(a3c.w[4] == "o4 SETSTA 7 PLAY\r\n", a3c.w[4])
-ReceivedFromProxy(5003, "OFF", {})
-a3c.h.OnConnect(a3c)
-assert(a3c.w[1] == "o1 REMSTR 7\r\n", a3c.w[1])
-print("SET_INPUT stream ok")
+Added.cb(100, { ChildNodes = { { Name = "protocol", Value = "100" }, { Name = "proxy", Value = "101" } } })
+assert(bound == "101 7000 36 2 AUDIO_SELECTION", tostring(bound))
+assert(posts[2] == 'http://127.0.0.1:3000/api/v1/items/100/identification {"address":"10.0.0.9"}', tostring(posts[2]))
+assert(Persist.OHC_AUDIO_CHILD == "100 101" and Renamed == "100 openHC EA3 Audio", tostring(Renamed))
+-- Later starts reuse it: no second device, only a re-identify if the address moved.
+Added = nil
+OHC_AUDIO_CHILD()
+assert(Added == nil and #posts == 4, #posts)
+C4.GetNetworkBindingsByDevice = function() return { networkbindings = { { addr = "10.0.0.9" } } } end
+OHC_AUDIO_CHILD()
+assert(#posts == 4)
+-- A Director without the model's driver gets the Triad One.
+Persist.OHC_AUDIO_CHILD = nil
+OHC_AUDIO_CHILD()
+Added.cb(0, {})
+assert(Added.c4i == "control4_tr1.c4i", Added.c4i)
+print("child.lua: ok (audio child added, wired and identified)")

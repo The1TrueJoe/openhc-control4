@@ -27,7 +27,7 @@
 local zState = { enabled = false, coordinator = 0, owner = 0, identified = false }
 
 -- c4zapd publishes state/zigbee under the box base; io.lua routes non-relay/contact
--- state here via OHC_STATE (audio.lua's chain is preserved).
+-- state here via OHC_STATE (io.lua's chain is preserved).
 local zPrevState = OHC_STATE
 function OHC_STATE(rest, payload)
   if rest == "state/zigbee" then
