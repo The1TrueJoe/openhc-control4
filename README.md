@@ -9,7 +9,8 @@ audio outputs, and still works.
 
 This project puts those controllers back into a current Control4 project. They
 run [openHC](https://github.com/The1TrueJoe/openHC) instead of Control4's OS,
-and one Control4 driver, `openhc.c4z`, gives Director what they have:
+and a Control4 driver for each model, `openhc-<model>.c4z`, gives Director what
+they have:
 
 - **IO:** relays, contacts, IR outputs and serial ports, as ordinary Control4
   connections.
@@ -41,10 +42,11 @@ for its display and storage.
 ## Install
 
 1. Install openHC with the
-   [openHC flasher](https://github.com/The1TrueJoe/openHC#the-flasher) and leave
-   **Make it a Control4 controller again** ticked. The flasher sets the box up and
-   saves `openhc.c4z` to your Downloads.
-2. In Composer Pro, add the driver (Driver → Add Driver… → `openhc.c4z`).
+   [openHC flasher](https://github.com/The1TrueJoe/openHC#the-flasher). On the
+   **What to install** screen, pick **Control4 controller**. The flasher
+   downloads everything itself, sets up the box, and saves your model's driver,
+   `openhc-<model>.c4z`, to your Downloads.
+2. In Composer Pro, add the driver (Driver → Add Driver… → `openhc-<model>.c4z`).
 3. Add the openHC box from the discovered devices. It fills in its own address.
    On the HC-250, CA-1 and IO Extender, enter the address on the Network tab
    instead.
@@ -57,47 +59,43 @@ for its display and storage.
    yet, its first output becomes the room's Audio End-Point. Bind its outputs
    like any controller's: AUDIO OUT, DIGITAL AUDIO OUT, HDMI AUDIO OUT. Composer
    shows that device as offline (it looks for Control4's own services on the
-   box); the audio plays regardless.
+   box). The audio plays anyway.
 
-The driver lists every board's connections, so leave the ones your box doesn't
-have unbound. Its Documentation tab shows the box's own openHC dashboard.
+The driver's Documentation tab shows the box's own openHC dashboard.
 
 On a box already running openHC: `ohc-flash control4 <ip>`.
-
-There are no releases yet, and the flasher downloads from the latest one. Until
-there is one, take `openhc.c4z` and the box package from a CI run's artifacts.
 
 The driver hands the box a token for your Control4 project, over plain TCP on
 your LAN, so its navigator can show the project. Set **Send Project Token** to
 No to keep the token on the controller.
 
-## Not yet confirmed
+## Zigbee
 
-- Digital audio on the EA-1, EA-5, HC-800 and HC-250. Director only streams to a
-  device whose driver can report the audio client's address, and only
-  Control4's compiled drivers can, so `child.lua` adds one: Control4's driver
-  for the model, pointed at the box through Director's own identify call. On an
-  EA-3, every output played radio and ShairBridge AirPlay with nothing per
-  source. The other models' outputs follow the port numbering of their
-  Control4 drivers (see `c4zones`), untested on hardware.
-- Which commands Director sends for IR and serial, and for a controller's own
-  output volume. The driver's **Last IO Command** property shows what arrives.
+An EA has a Zigbee radio. The flasher asks who should run it:
 
-## Build
+- **openHC Zigbee** (works today): openHC's zigbee-bridge runs the radio.
+  Standard Zigbee 3.0 devices pair with the box and show up on MQTT.
+- **Control4 Zigbee** (experimental): the radio becomes a Control4 Zigbee
+  access point, for Control4's own Zigbee devices. Director does not connect to
+  it yet, so Control4 devices can't use it today.
 
-CI builds both parts on every push: `openhc.c4z`, with Control4's driver
-packager, and `openhc-control4.tar.gz` for the box. Download them from the
-latest run's artifacts. By hand:
+To switch later, run one of these from any computer on your network:
 
 ```bash
-git submodule update --init --recursive
-driver/package.sh && (cd driver && lua test.lua)
+ssh root@<box> /data/extensions/control4/init zigbee control4
+ssh root@<box> /data/extensions/control4/init zigbee openhc
 ```
 
-| Path | What |
-|---|---|
-| `driver/` | the Control4 driver: the navigator (from control4-navigator-sink-lib), `io.lua`, `child.lua` (the audio device), `zigbee.lua` |
-| `navigator/` | submodule: control4-fake-navigator, the on-screen UI and its backend |
-| `audio-client/` | submodule: control4-audio-client |
-| `tools/` | box helpers: `c4sddp` (discovery, with the [sddp](https://github.com/The1TrueJoe/sddp) crate) and `c4zones` (audio zones from openHC's outputs) |
-| `box/init` | starts it all on the box, from `/data/extensions/control4` |
+Each one puts the right firmware back on the radio, and the choice stays after
+a reboot.
+
+## Not yet confirmed
+
+- Digital audio on the EA-1, EA-5, HC-800 and HC-250. On an EA-3, every output
+  played radio and ShairBridge AirPlay. The other models' outputs follow the
+  port numbering of their Control4 drivers, untested on hardware.
+- Which commands Director sends for IR and serial, and for a controller's own
+  output volume. The driver's **Last IO Command** property shows what arrives.
+- Control4 Zigbee, end to end (see above).
+
+To build it yourself or help out, see [CONTRIBUTING.md](CONTRIBUTING.md).
