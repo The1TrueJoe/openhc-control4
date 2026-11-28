@@ -22,8 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      # control4-zigbee is a private repo for now, so it is optional: without
+      # it the build has no c4zapd (box/init then leaves the radio to openHC).
+      - name: Submodules
+        run: |
+          git submodule update --init --recursive navigator audio-client driver/control4-lua-mqtt
+          git submodule update --init zigbee || echo "::warning::control4-zigbee not reachable: no c4zapd in this build"
       - name: Lua 5.1 + zip
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends lua5.1 zip
       # One .c4z per openHC model, generated from gen.py's table (static AV + IO,
@@ -57,8 +61,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      # control4-zigbee is a private repo for now, so it is optional: without
+      # it the build has no c4zapd (box/init then leaves the radio to openHC).
+      - name: Submodules
+        run: |
+          git submodule update --init --recursive navigator audio-client driver/control4-lua-mqtt
+          git submodule update --init zigbee || echo "::warning::control4-zigbee not reachable: no c4zapd in this build"
       - name: Rust (x86_64 musl) + a musl C compiler for ring
         run: |
           rustup target add x86_64-unknown-linux-musl
@@ -72,8 +80,9 @@ jobs:
         working-directory: tools
         run: cargo test && cargo build --release --target x86_64-unknown-linux-musl
       - name: Control4 Zigbee (c4zapd)
-        working-directory: zigbee
-        run: cargo test && cargo build --release --target x86_64-unknown-linux-musl --bin c4zapd
+        run: |
+          if [ ! -f zigbee/Cargo.toml ]; then echo "no control4-zigbee submodule"; exit 0; fi
+          cd zigbee && cargo test && cargo build --release --target x86_64-unknown-linux-musl --bin c4zapd
       - name: Audio client
         # control4-audio-client links GStreamer dynamically, so it is built against
         # an older glibc (bookworm's 2.36) than any openHC image's and runs on the
@@ -100,8 +109,10 @@ jobs:
           install -d $X/bin
           install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend $X/bin/c4nav
           install -m 0755 tools/target/x86_64-unknown-linux-musl/release/c4sddp \
-                          tools/target/x86_64-unknown-linux-musl/release/c4zones \
-                          zigbee/target/x86_64-unknown-linux-musl/release/c4zapd $X/bin/
+                          tools/target/x86_64-unknown-linux-musl/release/c4zones $X/bin/
+          if [ -f zigbee/target/x86_64-unknown-linux-musl/release/c4zapd ]; then
+            install -m 0755 zigbee/target/x86_64-unknown-linux-musl/release/c4zapd $X/bin/
+          fi
           if [ -f audio-client/target/release/c4-audio-client ]; then
             install -m 0755 audio-client/target/release/c4-audio-client $X/bin/
           fi
