@@ -19,11 +19,21 @@
 # audio client with no per-source driver. (Director only streams to Control4's
 # own drivers; a Lua driver can't report the client's address, see README.)
 #
+# Control4 Zigbee (experimental): `init zigbee control4` hands the box's EM357
+# to c4zapd (control4-zigbee), which runs it on Control4's own EmberZNet 4.7.2
+# as a Control4 Zigbee access point. `init zigbee openhc` gives it back to
+# openHC's zigbee-bridge. The choice is kept in c4zapd's mode file
+# (OHC_C4ZIGBEE_STATE, default /data/ohc/c4zigbee.mode) and in
+# /data/ohc/zigbee.env (OHC_ZIGBEE_STACK=none keeps openHC off the radio), so
+# it survives reboots and updates.
+#
 # Overrides (SINK_ADDR, HTTP_ADDR, C4_WALLPAPER, ...) in c4nav.conf next to this.
 D=$(cd "$(dirname "$0")" && pwd)
 PIDF=/run/c4nav.pid
 SDDP_PIDF=/run/c4sddp.pid
 AUDIO_PIDF=/run/c4audio.pid
+ZAP_PIDF=/run/c4zapd.pid
+ZIGBEE_ENV=/data/ohc/zigbee.env
 URL=http://localhost:8090/
 
 export SINK_ADDR=0.0.0.0:9010 HTTP_ADDR=127.0.0.1:8090 WEB_DIR=$D/www
@@ -64,6 +74,23 @@ board() {
 	esac
 }
 
+# c4zapd's mode file: control4 or standard.
+zstate() {
+	[ -r /opt/ohc/board.env ] && . /opt/ohc/board.env
+	ZSTATE="${OHC_C4ZIGBEE_STATE:-/data/ohc/c4zigbee.mode}"
+}
+
+zap_start() {
+	[ -x $D/bin/c4zapd ] && [ -e /dev/zigbee ] || return 0
+	start-stop-daemon -S -q -b -m -p $ZAP_PIDF -x /bin/sh -- "$0" zap
+}
+
+zap_stop() {
+	[ -f $ZAP_PIDF ] && start-stop-daemon -K -q -p $ZAP_PIDF
+	killall -q c4zapd 2>/dev/null
+	rm -f $ZAP_PIDF
+}
+
 case "$1" in
 	start)
 		[ -x $D/bin/c4nav ] || exit 0
@@ -75,11 +102,14 @@ case "$1" in
 		else
 			start-stop-daemon -S -q -b -m -p $AUDIO_PIDF -x /bin/sh -- "$0" audio
 		fi
+		zstate
+		[ "$(cat "$ZSTATE" 2>/dev/null)" = control4 ] && zap_start
 		;;
 	stop)
 		for p in $PIDF $SDDP_PIDF $AUDIO_PIDF; do [ -f $p ] && start-stop-daemon -K -q -p $p; done
 		killall -q c4nav c4sddp c4-audio-client 2>/dev/null
 		rm -f $PIDF $SDDP_PIDF $AUDIO_PIDF
+		zap_stop
 		;;
 	restart)
 		"$0" stop; sleep 1; "$0" start ;;
@@ -101,6 +131,49 @@ case "$1" in
 			esac
 			sleep 5
 		done ;;
+	zap)
+		# c4zapd: the Control4 Zigbee access point on the EM357. Restarted if it exits.
+		zstate
+		[ -r /opt/ohc/board.env ] && { set -a; . /opt/ohc/board.env; set +a; }
+		export OHC_ZIGBEE_TTY=/dev/zigbee OHC_ZIGBEE_TOOL=/opt/ohc/bin/zigbee OHC_C4ZIGBEE_STATE="$ZSTATE"
+		while :; do $D/bin/c4zapd 2>&1 | logger -t c4zapd; sleep 3; done ;;
+	zigbee)
+		# Who runs the Zigbee radio: control4 (c4zapd) or openhc (zigbee-bridge).
+		[ -e /dev/zigbee ] || { echo "This board has no Zigbee radio."; exit 0; }
+		zstate
+		mkdir -p /data/ohc "$(dirname "$ZSTATE")"
+		case "$2" in
+			control4)
+				[ -x $D/bin/c4zapd ] || { echo "c4zapd is not installed."; exit 1; }
+				[ -x /etc/init.d/S92ohczigbee-bridge ] && /etc/init.d/S92ohczigbee-bridge stop
+				[ -x /etc/init.d/S91ohczigbee ] && /etc/init.d/S91ohczigbee stop
+				echo "Putting Control4's Zigbee firmware back on the radio..."
+				if ! /opt/ohc/bin/zigbee --restore-stock; then
+					echo "Could not restore Control4's firmware. Giving the radio back to openHC."
+					[ -x /etc/init.d/S91ohczigbee ] && /etc/init.d/S91ohczigbee start
+					[ -x /etc/init.d/S92ohczigbee-bridge ] && /etc/init.d/S92ohczigbee-bridge start
+					exit 1
+				fi
+				[ -f $ZIGBEE_ENV ] && sed -i '/^OHC_ZIGBEE_STACK=/d' $ZIGBEE_ENV
+				echo OHC_ZIGBEE_STACK=none >> $ZIGBEE_ENV
+				echo control4 > "$ZSTATE"
+				zap_start
+				echo "Zigbee: Control4 (c4zapd)."
+				;;
+			openhc)
+				zap_stop
+				[ -f $ZIGBEE_ENV ] && sed -i '/^OHC_ZIGBEE_STACK=none$/d' $ZIGBEE_ENV
+				echo standard > "$ZSTATE"
+				# S91 flashes openHC's own firmware back on the radio.
+				[ -x /etc/init.d/S91ohczigbee ] && /etc/init.d/S91ohczigbee start
+				[ -x /etc/init.d/S92ohczigbee-bridge ] && /etc/init.d/S92ohczigbee-bridge start
+				echo "Zigbee: openHC (zigbee-bridge)."
+				;;
+			*)
+				echo "Zigbee: $(cat "$ZSTATE" 2>/dev/null || echo standard)"
+				echo "Usage: $0 zigbee {control4|openhc}"; exit 1 ;;
+		esac
+		;;
 	display)
 		# The same config webd's POST /api/display writes, where S95ohc-display reads it.
 		[ -r /opt/ohc/board.env ] && . /opt/ohc/board.env
@@ -109,5 +182,5 @@ case "$1" in
 		[ -x /etc/init.d/S95ohc-display ] && /etc/init.d/S95ohc-display reload
 		;;
 	*)
-		echo "Usage: $0 {start|stop|restart|display}"; exit 1 ;;
+		echo "Usage: $0 {start|stop|restart|display|zigbee control4|zigbee openhc}"; exit 1 ;;
 esac
