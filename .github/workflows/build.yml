@@ -1,8 +1,9 @@
 name: build
 
-# Two artifacts, attached to a release when one is published:
-#   openhc.c4z                  the Control4 driver, built with Control4's driver
-#                               packager (Composer Pro: add driver)
+# Two kinds of artifact, attached to a release when one is published, and to the
+# rolling `dev` pre-release on every push to main:
+#   openhc-<model>.c4z          the Control4 driver, one per model, built with
+#                               Control4's driver packager (Composer Pro: add driver)
 #   openhc-control4.tar.gz      what goes on the box: control4/, unpacked into
 #                               /data/extensions (x86_64: HC-800 and the EAs)
 on:
@@ -70,6 +71,9 @@ jobs:
       - name: Box tools (c4sddp, c4zones)
         working-directory: tools
         run: cargo test && cargo build --release --target x86_64-unknown-linux-musl
+      - name: Control4 Zigbee (c4zapd)
+        working-directory: zigbee
+        run: cargo test && cargo build --release --target x86_64-unknown-linux-musl --bin c4zapd
       - name: Audio client
         # control4-audio-client links GStreamer dynamically, so it is built against
         # an older glibc (bookworm's 2.36) than any openHC image's and runs on the
@@ -96,7 +100,8 @@ jobs:
           install -d $X/bin
           install -m 0755 navigator/backend/target/x86_64-unknown-linux-musl/release/c4-fake-navigator-backend $X/bin/c4nav
           install -m 0755 tools/target/x86_64-unknown-linux-musl/release/c4sddp \
-                          tools/target/x86_64-unknown-linux-musl/release/c4zones $X/bin/
+                          tools/target/x86_64-unknown-linux-musl/release/c4zones \
+                          zigbee/target/x86_64-unknown-linux-musl/release/c4zapd $X/bin/
           if [ -f audio-client/target/release/c4-audio-client ]; then
             install -m 0755 audio-client/target/release/c4-audio-client $X/bin/
           fi
@@ -125,3 +130,37 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber --repo "${{ github.repository }}"
+
+  # The rolling `dev` pre-release: every push to main replaces its assets with
+  # this run's (the names are stable, so --clobber replaces them in place).
+  dev-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [driver, box]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: dev-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to the dev pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ls -l dist
+          # The tag first (create, or move it here), then the release on it.
+          if gh api "repos/$GH_REPO/git/refs/tags/dev" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/dev" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/dev -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          gh release view dev >/dev/null 2>&1 || \
+            gh release create dev --prerelease --title "dev (rolling)" \
+              --notes "Rolling builds of main, replaced on every push. Not a release: for that, use the latest published one."
+          gh release upload dev dist/* --clobber
