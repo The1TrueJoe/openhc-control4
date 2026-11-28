@@ -69,33 +69,4 @@ The driver hands the box a token for your Control4 project, over plain TCP on
 your LAN, so its navigator can show the project. Set **Send Project Token** to
 No to keep the token on the controller.
 
-## Zigbee
-
-An EA has a Zigbee radio. The flasher asks who should run it:
-
-- **openHC Zigbee** (works today): openHC's zigbee-bridge runs the radio.
-  Standard Zigbee 3.0 devices pair with the box and show up on MQTT.
-- **Control4 Zigbee** (experimental): the radio becomes a Control4 Zigbee
-  access point, for Control4's own Zigbee devices. Director does not connect to
-  it yet, so Control4 devices can't use it today.
-
-To switch later, run one of these from any computer on your network:
-
-```bash
-ssh root@<box> /data/extensions/control4/init zigbee control4
-ssh root@<box> /data/extensions/control4/init zigbee openhc
-```
-
-Each one puts the right firmware back on the radio, and the choice stays after
-a reboot.
-
-## Not yet confirmed
-
-- Digital audio on the EA-1, EA-5, HC-800 and HC-250. On an EA-3, every output
-  played radio and ShairBridge AirPlay. The other models' outputs follow the
-  port numbering of their Control4 drivers, untested on hardware.
-- Which commands Director sends for IR and serial, and for a controller's own
-  output volume. The driver's **Last IO Command** property shows what arrives.
-- Control4 Zigbee, end to end (see above).
-
 To build it yourself or help out, see [CONTRIBUTING.md](CONTRIBUTING.md).
