@@ -7,3 +7,6 @@
 [submodule "control4-lua-mqtt"]
 	path = driver/control4-lua-mqtt
 	url = https://github.com/The1TrueJoe/control4-lua-mqtt
+[submodule "zigbee"]
+	path = zigbee
+	url = https://github.com/The1TrueJoe/control4-zigbee

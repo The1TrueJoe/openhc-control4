@@ -15,7 +15,7 @@
     driver -> box   <base>/cmd/zigbee    {"op":"enable|disable|coordinator|zserver|channel", ...}
     box -> driver   <base>/state/zigbee  {"enabled":bool,"coordinator":0|1,"owner":N,"identified":bool}  (retained)
 
-  ponytail: BOTH the ExecuteCommand entrypoint and the c4zapd cmd/state topic+payload
+  Note: BOTH the ExecuteCommand entrypoint and the c4zapd cmd/state topic+payload
   are RE-inferred, not yet verified on hardware. Stock routes these in native code,
   so the Director MAY refuse to deliver them to a DriverWorks driver at all — then
   the handler never fires and c4zapd runs as its own standalone coordinator instead.
